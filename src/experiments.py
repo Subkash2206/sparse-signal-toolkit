@@ -11,6 +11,8 @@ from dft import dft
 
 from reconstruction import sinc_reconstruct
 
+from windows import rectangular, hann, hamming
+
 
 # defines sampling frequency and observation window
 # NOTE: fs intentionally violates Nyquist for 120 Hz
@@ -81,5 +83,36 @@ plt.plot(t_s, x_s, 'o', label="Samples")
 plt.xlabel("Time (s)")
 plt.ylabel("Amplitude")
 plt.title("Reconstruction after Aliasing (fs = 180 Hz)")
+plt.legend()
+plt.show()
+
+
+
+# Spectral leakage experiment
+fs = 1000
+duration = 1.0
+
+# choose a frequency that does NOT align with DFT bins
+t, x = two_tone_signal(55, 120, fs, duration)
+
+N = len(x)
+
+windows = {
+    "Rectangular": rectangular(N),
+    "Hann": hann(N),
+    "Hamming": hamming(N)
+}
+
+plt.figure(figsize=(10, 6))
+
+for name, w in windows.items():
+    Xw = dft(x * w)
+    freqs = np.arange(len(Xw)) * fs / len(Xw)
+    plt.plot(freqs, np.abs(Xw) / len(Xw), label=name)
+
+plt.xlim(0, 200)
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude")
+plt.title("Spectral Leakage with Different Windows")
 plt.legend()
 plt.show()
