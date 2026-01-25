@@ -20,16 +20,16 @@ This project investigates the following questions:
 Each question is addressed using controlled experiments where the signal content is known in advance.
 
 ---
-
 ## Project Structure
 
+```text
 src/
-├── signals.py # Signal generation (ground truth)
-├── dft.py # Discrete Fourier Transform (from definition)
-├── reconstruction.py # Ideal sinc-based reconstruction
-├── windows.py # Window functions (rectangular, Hann, Hamming)
-└── experiments.py # All experiments and visualizations
-
+├── signals.py          # Signal generation (ground truth)
+├── dft.py              # Discrete Fourier Transform (from definition)
+├── reconstruction.py   # Ideal sinc-based reconstruction
+├── windows.py          # Window functions and leakage analysis
+└── experiments.py      # Controlled experiments and visualizations
+```
 
 The code is intentionally modular so that each concept can be studied independently.
 
@@ -41,6 +41,7 @@ Signals are synthesized directly in the time domain using sums of sinusoids.
 For most experiments, a two-tone signal is used:
 
 x(t) = sin(2π · 50t) + 0.5 · sin(2π · 120t)
+
 
 
 Because the signal is constructed explicitly, its frequency content is known beforehand. This makes it possible to distinguish genuine DSP effects from implementation errors.
