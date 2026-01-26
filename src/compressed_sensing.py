@@ -30,6 +30,39 @@ def create_sensing_matrix(t_samples, N_grid):
             
     return Theta
 
+def create_dct_dictionary(t_samples, N_grid):
+    """
+    Creates the sensing matrix for DCT-II basis.
+    Used for real-valued signals like images.
+    
+    t_samples: Indices of observed samples.
+    N_grid: Total signal length.
+    
+    Returns:
+        Theta = Phi * Psi (Measurement * Inverse DCT)
+    """
+    M = len(t_samples)
+    Theta = np.zeros((M, N_grid))
+    
+    # DCT-II formula for the k-th basis vector
+    # The Inverse DCT-II (Orthonormal) matrix element (n, k)
+    # x[n] = sum_k s[k] * w[k] * cos(pi * k * (2n + 1) / (2N))
+    # where w[k] is normalization factor
+    
+    # We construct rows corresponding to t_samples
+    for i, t_val in enumerate(t_samples):
+        for k in range(N_grid):
+            # Normalization factor
+            if k == 0:
+                alpha = np.sqrt(1 / N_grid)
+            else:
+                alpha = np.sqrt(2 / N_grid)
+            
+            # Basis element
+            Theta[i, k] = alpha * np.cos(np.pi * k * (2 * t_val + 1) / (2 * N_grid))
+            
+    return Theta
+
 def matching_pursuit(y, Theta, max_iterations=20, tolerance=1e-6):
     """
     Performs Matching Pursuit (MP) to find sparse coefficients 's'.

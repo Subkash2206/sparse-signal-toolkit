@@ -7,7 +7,7 @@ def dft(x):
     Computes the Discrete Fourier Transform (DFT) of a 1D signal.
     """
     # we take a 1D array of samples (assumed to be finite length and discrete-time)
-    x = np.asarray(x, dtype=float)
+    x = np.asarray(x, dtype=complex)
 
     #defines the sample resolution (more samples -> better frequency resolution)
     N = x.shape[0]
