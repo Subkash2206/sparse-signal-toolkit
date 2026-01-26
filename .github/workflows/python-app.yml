@@ -25,5 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest numpy scipy matplotlib
     - name: Run Tests with pytest
+      env:
+        PYTHONPATH: src
       run: |
         pytest
