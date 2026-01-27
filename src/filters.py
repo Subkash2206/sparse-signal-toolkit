@@ -59,23 +59,9 @@ def convolve(x, h):
     Returns:
     np.ndarray: Convolved result (mode='full').
     """
-    x = np.asarray(x)
-    h = np.asarray(h)
+    # Optimized implementation using NumPy's underlying C-loop
+    # mode='full' returns the full convolution result (length N+M-1)
     
-    N = len(x)
-    M = len(h)
+    y = np.convolve(x, h, mode='full')
     
-    # Result length for 'full' convolution is N + M - 1
-    y_len = N + M - 1
-    y = np.zeros(y_len)
-    
-    # Naive nested loop implementation
-    for n in range(y_len):
-        # Convolution sum
-        val = 0.0
-        for k in range(M):
-            if 0 <= n - k < N:
-                val += h[k] * x[n - k]
-        y[n] = val
-        
     return y

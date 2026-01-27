@@ -16,10 +16,21 @@ def dft(x):
     X = np.zeros(N, dtype=complex)
 
 
-    # we apply the discrete fourier transform formula directly here
-    for k in range(N):
-        for n in range(N):
-            X[k] += x[n] * np.exp(-2j * np.pi * k * n / N)
-
-    #frequency domain representation
+    # Implementation:
+    # X[k] = sum_n x[n] * exp(-2j * pi * k * n / N)
+    # This can be written as a Matrix-Vector multiplication: X = W @ x
+    # where W[k, n] = exp(-2j * pi * k * n / N)
+    
+    k = np.arange(N).reshape((N, 1))  # Column vector
+    n = np.arange(N).reshape((1, N))  # Row vector
+    
+    # Broadcast to create N x N matrix of exponents
+    exponent = -2j * np.pi * k * n / N
+    
+    # Compute Twiddle Matrix
+    W = np.exp(exponent)
+    
+    # Matrix-Vector Multiplication
+    X = np.dot(W, x)
+    
     return X
