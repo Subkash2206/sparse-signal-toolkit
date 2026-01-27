@@ -35,4 +35,29 @@ def test_fft_impulse():
     X = fft(x)
     expected = np.ones(N, dtype=complex)
     
+    
     np.testing.assert_allclose(X, expected, atol=TOLERANCE)
+
+def test_ifft_vs_numpy():
+    """ Verify IFFT matches NumPy IFFT. """
+    from fft import ifft
+    N = 32
+    np.random.seed(43)
+    # Random frequency domain signal
+    X = np.random.randn(N) + 1j * np.random.randn(N)
+    
+    x_our = ifft(X)
+    x_numpy = np.fft.ifft(X)
+    
+    np.testing.assert_allclose(x_our, x_numpy, atol=TOLERANCE)
+
+def test_fft_ifft_integrity():
+    """ Verify IFFT(FFT(x)) == x. """
+    from fft import ifft
+    N = 64
+    x = np.random.randn(N)
+    
+    X = fft(x)
+    x_rec = ifft(X)
+    
+    np.testing.assert_allclose(x, x_rec, atol=TOLERANCE)

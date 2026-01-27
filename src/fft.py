@@ -85,3 +85,23 @@ def fft_iterative(x):
                 w = w * w_m
     
     return X
+
+
+def ifft(x):
+    """
+    Computes the Inverse Fast Fourier Transform (IFFT).
+    
+    Uses the conjugate trick to reuse the forward FFT implementation:
+    IFFT(x) = conj(FFT(conj(x))) / N
+    """
+    x = np.asarray(x, dtype=complex)
+    N = x.shape[0]
+    
+    # Conjugate the input
+    x_conj = np.conjugate(x)
+    
+    # Compute forward FFT
+    X_conj = fft(x_conj)
+    
+    # Conjugate the result and scale by 1/N
+    return np.conjugate(X_conj) / N
