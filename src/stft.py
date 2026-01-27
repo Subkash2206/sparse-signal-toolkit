@@ -1,7 +1,7 @@
 # src/stft.py
 
 import numpy as np
-from src.fft import fft
+from fft import fft
 
 def stft(x, window, hop_size):
     """

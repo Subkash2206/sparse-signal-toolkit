@@ -1,7 +1,7 @@
 # src/filters.py
 
 import numpy as np
-from src.windows import hamming
+from windows import hamming
 
 def low_pass_filter(fc, fs, num_taps):
     """
