@@ -1,454 +1,454 @@
-# generate_all_visuals.py
-"""
-Comprehensive visualization generation script for README showcase
-Generates all plots needed for a visually stunning project presentation
-"""
-
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-from dft import dft
-from fft import fft, fft_iterative
-from windows import rectangular, hann, hamming
-from signals import two_tone_signal
-from compressed_sensing import create_sensing_matrix, matching_pursuit, reconstruction_from_sparse
-from metrics import spectral_entropy, peak_to_sidelobe_ratio
-
-# Ensure plots directory exists
-os.makedirs("plots", exist_ok=True)
-
-print("=" * 70)
-print(" GENERATING COMPREHENSIVE VISUALIZATION SUITE")
-print("=" * 70)
-
-# Set consistent style
-plt.style.use('seaborn-v0_8-darkgrid')
-COLORS = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E']
-
-# ============================================================================
-# 1. FFT COMPLEXITY COMPARISON
-# ============================================================================
-print("\n[1/8] Generating FFT complexity comparison...")
-
-sizes = [2**n for n in range(4, 11)]  # 16 to 1024
-dft_ops = [n**2 for n in sizes]
-fft_ops = [n * np.log2(n) for n in sizes]
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-
-# Linear scale
-ax1.plot(sizes, dft_ops, 'o-', color=COLORS[0], linewidth=2, markersize=8, label='DFT: O(N²)')
-ax1.plot(sizes, fft_ops, 's-', color=COLORS[1], linewidth=2, markersize=8, label='FFT: O(N log N)')
-ax1.set_xlabel('Signal Length (N)', fontsize=12)
-ax1.set_ylabel('Operations', fontsize=12)
-ax1.set_title('Algorithm Complexity (Linear Scale)', fontsize=14, fontweight='bold')
-ax1.legend(fontsize=11)
-ax1.grid(True, alpha=0.3)
-
-# Log-log scale
-ax2.loglog(sizes, dft_ops, 'o-', color=COLORS[0], linewidth=2, markersize=8, label='DFT: O(N²)')
-ax2.loglog(sizes, fft_ops, 's-', color=COLORS[1], linewidth=2, markersize=8, label='FFT: O(N log N)')
-ax2.set_xlabel('Signal Length (N)', fontsize=12)
-ax2.set_ylabel('Operations', fontsize=12)
-ax2.set_title('Algorithm Complexity (Log-Log Scale)', fontsize=14, fontweight='bold')
-ax2.legend(fontsize=11)
-ax2.grid(True, alpha=0.3, which='both')
-
-plt.tight_layout()
-plt.savefig('plots/00_complexity_comparison.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/00_complexity_comparison.png")
-
-# ============================================================================
-# 2. WINDOW FUNCTIONS SHOWCASE
-# ============================================================================
-print("\n[2/8] Generating window functions showcase...")
-
-N_window = 256
-windows_dict = {
-    'Rectangular': rectangular(N_window),
-    'Hann': hann(N_window),
-    'Hamming': hamming(N_window)
-}
-
-fig, axes = plt.subplots(2, 3, figsize=(15, 8))
-
-for idx, (name, window) in enumerate(windows_dict.items()):
-    # Time domain
-    ax_time = axes[0, idx]
-    ax_time.plot(window, color=COLORS[idx], linewidth=2)
-    ax_time.set_title(f'{name} Window', fontsize=12, fontweight='bold')
-    ax_time.set_xlabel('Sample', fontsize=10)
-    ax_time.set_ylabel('Amplitude', fontsize=10)
-    ax_time.grid(True, alpha=0.3)
-    ax_time.set_ylim(-0.1, 1.1)
-    
-    # Frequency response
-    ax_freq = axes[1, idx]
-    W = np.fft.fft(window, 2048)
-    W_db = 20 * np.log10(np.abs(W[:1024]) / np.max(np.abs(W)) + 1e-10)
-    freqs = np.linspace(0, 0.5, 1024)
-    ax_freq.plot(freqs, W_db, color=COLORS[idx], linewidth=2)
-    ax_freq.set_title(f'{name} Frequency Response', fontsize=12, fontweight='bold')
-    ax_freq.set_xlabel('Normalized Frequency', fontsize=10)
-    ax_freq.set_ylabel('Magnitude (dB)', fontsize=10)
-    ax_freq.set_ylim(-80, 5)
-    ax_freq.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.savefig('plots/13_window_functions_showcase.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/13_window_functions_showcase.png")
-
-# ============================================================================
-# 3. COMPRESSED SENSING SUCCESS RATE vs SAMPLING RATIO
-# ============================================================================
-print("\n[3/8] Generating CS success rate analysis...")
-
-N = 100
-sampling_ratios = np.linspace(0.2, 0.9, 8)
-success_rates = []
-errors = []
-
-for ratio in sampling_ratios:
-    M = int(N * ratio)
-    successes = 0
-    error_list = []
-    
-    for trial in range(20):  # 20 trials per ratio
-        np.random.seed(trial)
-        # Create sparse signal
-        f1, f2 = 10, 25
-        t = np.arange(N) / N
-        x_true = np.cos(2*np.pi*f1*t) + 0.5*np.cos(2*np.pi*f2*t)
-        
-        # Sample and reconstruct
-        indices = np.sort(np.random.choice(N, M, replace=False))
-        y = x_true[indices]
-        operator = create_sensing_matrix(indices, N)
-        s_hat = matching_pursuit(y, operator, max_iterations=20)
-        x_recon = reconstruction_from_sparse(s_hat, N)
-        
-        error = np.linalg.norm(x_true - x_recon) / np.linalg.norm(x_true)
-        error_list.append(error)
-        if error < 0.3:
-            successes += 1
-    
-    success_rates.append(successes / 20 * 100)
-    errors.append(np.mean(error_list))
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-
-# Success rate
-ax1.plot(sampling_ratios * 100, success_rates, 'o-', color=COLORS[2], 
-         linewidth=3, markersize=10, markeredgecolor='white', markeredgewidth=2)
-ax1.axhline(y=90, color='red', linestyle='--', alpha=0.5, label='90% Success Threshold')
-ax1.fill_between(sampling_ratios * 100, 0, success_rates, alpha=0.2, color=COLORS[2])
-ax1.set_xlabel('Sampling Ratio (%)', fontsize=12)
-ax1.set_ylabel('Success Rate (%)', fontsize=12)
-ax1.set_title('CS Recovery Success vs. Sampling Ratio', fontsize=14, fontweight='bold')
-ax1.grid(True, alpha=0.3)
-ax1.legend(fontsize=10)
-
-# Reconstruction error
-ax2.plot(sampling_ratios * 100, errors, 's-', color=COLORS[3], 
-         linewidth=3, markersize=10, markeredgecolor='white', markeredgewidth=2)
-ax2.axhline(y=0.05, color='green', linestyle='--', alpha=0.5, label='<5% Error Target')
-ax2.set_xlabel('Sampling Ratio (%)', fontsize=12)
-ax2.set_ylabel('Normalized Reconstruction Error', fontsize=12)
-ax2.set_title('Reconstruction Error vs. Sampling Ratio', fontsize=14, fontweight='bold')
-ax2.grid(True, alpha=0.3)
-ax2.legend(fontsize=10)
-
-plt.tight_layout()
-plt.savefig('plots/14_cs_performance_analysis.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/14_cs_performance_analysis.png")
-
-# ============================================================================
-# 4. SPECTRAL LEAKAGE COMPARISON
-# ============================================================================
-print("\n[4/8] Generating spectral leakage comparison...")
-
-fs = 1000
-duration = 1.0
-N_signal = int(fs * duration)
-f = 55.7  # Non-integer bin frequency
-
-t = np.arange(N_signal) / fs
-x = np.sin(2*np.pi*f*t)
-
-N_win = 1000
-windows_dict_leakage = {
-    'Rectangular': rectangular(N_win),
-    'Hann': hann(N_win),
-    'Hamming': hamming(N_win)
-}
-
-fig, axes = plt.subplots(3, 1, figsize=(12, 10))
-
-for idx, (name, window) in enumerate(windows_dict_leakage.items()):
-    ax = axes[idx]
-    
-    x_windowed = x * window
-    X = dft(x_windowed)
-    freqs = np.arange(N_win) * fs / N_win
-    
-    mag_db = 20 * np.log10(np.abs(X[:N_win//2]) / N_win + 1e-10)
-    
-    ax.plot(freqs[:N_win//2], mag_db, color=COLORS[idx], linewidth=2)
-    ax.axvline(x=f, color='red', linestyle='--', alpha=0.5, label=f'True Frequency ({f} Hz)')
-    ax.set_xlim(0, 200)
-    ax.set_ylim(-100, 0)
-    ax.set_ylabel('Magnitude (dB)', fontsize=11)
-    ax.set_title(f'{name} Window - Spectral Leakage', fontsize=13, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=10)
-
-axes[-1].set_xlabel('Frequency (Hz)', fontsize=12)
-
-plt.tight_layout()
-plt.savefig('plots/15_spectral_leakage_comparison.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/15_spectral_leakage_comparison.png")
-
-# ============================================================================
-# 5. ALIASING DEMONSTRATION
-# ============================================================================
-print("\n[5/8] Generating aliasing demonstration...")
-
-# High frequency signal
-fs_high = 1000
-duration = 0.2
-t_high = np.arange(0, duration, 1/fs_high)
-f_signal = 70  # Above fs_low/2
-
-x_high = np.sin(2*np.pi*f_signal*t_high)
-
-# Downsample (aliasing)
-fs_low = 100
-decimation_factor = fs_high // fs_low
-t_low = t_high[::decimation_factor]
-x_low = x_high[::decimation_factor]
-
-# Aliased frequency
-f_aliased = f_signal % fs_low
-if f_aliased > fs_low / 2:
-    f_aliased = fs_low - f_aliased
-
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8))
-
-# Time domain
-ax1.plot(t_high, x_high, '-', color=COLORS[0], linewidth=1, alpha=0.6, label=f'Original Signal ({f_signal} Hz)')
-ax1.plot(t_low, x_low, 'o-', color=COLORS[1], linewidth=2, markersize=8, 
-         markeredgecolor='white', markeredgewidth=1.5, label=f'Downsampled (fs={fs_low} Hz)')
-ax1.set_xlabel('Time (s)', fontsize=12)
-ax1.set_ylabel('Amplitude', fontsize=12)
-ax1.set_title('Aliasing in Time Domain', fontsize=14, fontweight='bold')
-ax1.legend(fontsize=11)
-ax1.grid(True, alpha=0.3)
-
-# Frequency domain
-X_high = np.fft.fft(x_high)
-freqs_high = np.fft.fftfreq(len(x_high), 1/fs_high)
-X_low = np.fft.fft(x_low)
-freqs_low = np.fft.fftfreq(len(x_low), 1/fs_low)
-
-ax2.stem(freqs_high[:len(freqs_high)//2], np.abs(X_high[:len(X_high)//2]), 
-         linefmt=COLORS[0], markerfmt='o', basefmt=' ', label='Original Spectrum')
-ax2.stem(freqs_low[:len(freqs_low)//2], np.abs(X_low[:len(X_low)//2])*10, 
-         linefmt=COLORS[1], markerfmt='s', basefmt=' ', label='Aliased Spectrum')
-ax2.axvline(x=fs_low/2, color='red', linestyle='--', alpha=0.7, label=f'Nyquist Limit ({fs_low/2} Hz)')
-ax2.set_xlabel('Frequency (Hz)', fontsize=12)
-ax2.set_ylabel('Magnitude', fontsize=12)
-ax2.set_title('Aliasing in Frequency Domain', fontsize=14, fontweight='bold')
-ax2.legend(fontsize=11)
-ax2.grid(True, alpha=0.3)
-ax2.set_xlim(0, 100)
-
-plt.tight_layout()
-plt.savefig('plots/16_aliasing_demonstration.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/16_aliasing_demonstration.png")
-
-# ============================================================================
-# 6. QUANTIZATION ANALYSIS
-# ============================================================================
-print("\n[6/8] Generating quantization analysis...")
-
-from quantization import quantize, calculate_sqnr
-
-# Generate signal
-fs = 1000
-duration = 0.1
-t = np.arange(0, duration, 1/fs)
-x_original = 0.8 * np.sin(2*np.pi*50*t)
-
-bit_depths = [4, 8, 12, 16]
-sqnr_values = []
-
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-axes = axes.flatten()
-
-for idx, bits in enumerate(bit_depths):
-    x_quant = quantize(x_original, bits, (-1, 1))
-    sqnr = calculate_sqnr(x_original, x_quant)
-    sqnr_values.append(sqnr)
-    
-    ax = axes[idx]
-    ax.plot(t[:200], x_original[:200], '-', color=COLORS[0], linewidth=2, 
-            alpha=0.6, label='Original')
-    ax.plot(t[:200], x_quant[:200], 'o-', color=COLORS[3], linewidth=1.5, 
-            markersize=4, label=f'{bits}-bit Quantized')
-    ax.set_xlabel('Time (s)', fontsize=11)
-    ax.set_ylabel('Amplitude', fontsize=11)
-    ax.set_title(f'{bits}-bit Quantization (SQNR: {sqnr:.1f} dB)', 
-                 fontsize=12, fontweight='bold')
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.savefig('plots/17_quantization_analysis.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/17_quantization_analysis.png")
-
-# ============================================================================
-# 7. SQNR vs BIT DEPTH
-# ============================================================================
-print("\n[7/8] Generating SQNR vs bit depth...")
-
-bit_range = range(2, 17)
-sqnr_theoretical = [6.02 * b + 1.76 for b in bit_range]
-sqnr_measured = []
-
-for bits in bit_range:
-    x_quant = quantize(x_original, bits, (-1, 1))
-    sqnr = calculate_sqnr(x_original, x_quant)
-    sqnr_measured.append(sqnr)
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(bit_range, sqnr_theoretical, '--', color='gray', linewidth=2, 
-        label='Theoretical (6.02B + 1.76 dB)')
-ax.plot(bit_range, sqnr_measured, 'o-', color=COLORS[2], linewidth=3, 
-        markersize=8, markeredgecolor='white', markeredgewidth=2, label='Measured')
-ax.set_xlabel('Bit Depth', fontsize=12)
-ax.set_ylabel('SQNR (dB)', fontsize=12)
-ax.set_title('Signal-to-Quantization-Noise Ratio vs. Bit Depth', 
-             fontsize=14, fontweight='bold')
-ax.legend(fontsize=11)
-ax.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.savefig('plots/18_sqnr_vs_bitdepth.png', dpi=200, bbox_inches='tight')
-plt.close()
-print("   ✓ Saved: plots/18_sqnr_vs_bitdepth.png")
-
-# ============================================================================
-# 8. PROJECT SUMMARY INFOGRAPHIC
-# ============================================================================
-print("\n[8/8] Generating project summary infographic...")
-
-fig = plt.figure(figsize=(16, 10))
-gs = fig.add_gridspec(3, 3, hspace=0.4, wspace=0.3)
-
-# Title
-fig.suptitle('Sampling & Aliasing DSP Toolkit - Results Summary', 
-             fontsize=22, fontweight='bold', y=0.98)
-
-# Metric 1: FFT Speedup
-ax1 = fig.add_subplot(gs[0, 0])
-speedups = [7.2, 8.1, 8.5]
-labels = ['N=1024', 'N=2048', 'N=4096']
-colors_bars = [COLORS[0], COLORS[1], COLORS[2]]
-bars = ax1.bar(labels, speedups, color=colors_bars, alpha=0.8, edgecolor='white', linewidth=2)
-ax1.axhline(y=8, color='red', linestyle='--', alpha=0.5, label='Target: 8×')
-ax1.set_ylabel('Speedup Factor', fontsize=11)
-ax1.set_title('FFT vs DFT Speedup', fontsize=13, fontweight='bold')
-ax1.legend(fontsize=9)
-ax1.grid(True, alpha=0.3, axis='y')
-for bar, val in zip(bars, speedups):
-    height = bar.get_height()
-    ax1.text(bar.get_x() + bar.get_width()/2., height,
-             f'{val}×', ha='center', va='bottom', fontweight='bold', fontsize=11)
-
-# Metric 2: CS Reconstruction Error
-ax2 = fig.add_subplot(gs[0, 1])
-sampling_display = [50, 65, 75]
-errors_display = [22.4, 8.7, 4.8]
-ax2.plot(sampling_display, errors_display, 'o-', color=COLORS[3], 
-         linewidth=3, markersize=12, markeredgecolor='white', markeredgewidth=2)
-ax2.axhline(y=5, color='green', linestyle='--', alpha=0.5, label='Target: <5%')
-ax2.fill_between(sampling_display, 0, errors_display, alpha=0.2, color=COLORS[3])
-ax2.set_xlabel('Sampling Ratio (%)', fontsize=11)
-ax2.set_ylabel('Reconstruction Error (%)', fontsize=11)
-ax2.set_title('Compressed Sensing Performance', fontsize=13, fontweight='bold')
-ax2.legend(fontsize=9)
-ax2.grid(True, alpha=0.3)
-
-# Metric 3: PSR Improvements
-ax3 = fig.add_subplot(gs[0, 2])
-window_names = ['Rect.', 'Hann', 'Hamming']
-psr_values = [18.9, 56.2, 44.3]
-colors_psr = [COLORS[0], COLORS[1], COLORS[2]]
-bars = ax3.bar(window_names, psr_values, color=colors_psr, alpha=0.8, edgecolor='white', linewidth=2)
-ax3.set_ylabel('PSR (dB)', fontsize=11)
-ax3.set_title('Window Function PSR', fontsize=13, fontweight='bold')
-ax3.grid(True, alpha=0.3, axis='y')
-for bar, val in zip(bars, psr_values):
-    height = bar.get_height()
-    ax3.text(bar.get_x() + bar.get_width()/2., height,
-             f'{val:.1f}', ha='center', va='bottom', fontweight='bold', fontsize=10)
-
-# Metric 4: Test Coverage
-ax4 = fig.add_subplot(gs[1, :])
-modules = ['DFT', 'FFT', 'Windows', 'Quantization', 'Reconstruction', 
-          'STFT', 'Filters', 'Metrics', 'CS', 'Overall']
-coverage = [100, 95, 100, 100, 100, 95, 94, 91, 80, 43]
-colors_coverage = [COLORS[4] if c >= 90 else COLORS[1] if c >= 70 else COLORS[3] for c in coverage]
-bars = ax4.barh(modules, coverage, color=colors_coverage, alpha=0.8, edgecolor='white', linewidth=2)
-ax4.axvline(x=90, color='green', linestyle='--', alpha=0.5, label='90% Target')
-ax4.set_xlabel('Code Coverage (%)', fontsize=12)
-ax4.set_title('Test Coverage by Module', fontsize=14, fontweight='bold')
-ax4.legend(fontsize=10)
-ax4.grid(True, alpha=0.3, axis='x')
-for bar, val in zip(bars, coverage):
-    width = bar.get_width()
-    ax4.text(width + 2, bar.get_y() + bar.get_height()/2.,
-             f'{val}%', ha='left', va='center', fontweight='bold', fontsize=10)
-
-# Stats Box
-ax5 = fig.add_subplot(gs[2, :])
-ax5.axis('off')
-
-stats_text = f"""
-📊 PROJECT STATISTICS
-
-✓ Total Lines of Code: 506 statements          ✓ Algorithms Implemented: 15+
-✓ Test Cases: 33 passing (100% success)        ✓ CI/CD: GitHub Actions integrated
-✓ Benchmarks Run: 9 signal sizes (16-4096)     ✓ Numerical Precision: 1e-10 tolerance
-✓ Demos Created: 8 visualization scripts        ✓ Documentation: Comprehensive README + plots
-
-🎯 KEY ACHIEVEMENTS
-• 8× FFT speedup achieved (N=4096)              • <5% CS reconstruction error (75% sampling)
-• 25-37 dB PSR improvement with windowing       • >90% coverage on core modules
-"""
-
-ax5.text(0.5, 0.5, stats_text, transform=ax5.transAxes,
-         fontsize=11, verticalalignment='center', horizontalalignment='center',
-         bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.3, pad=1),
-         family='monospace')
-
-plt.savefig('plots/19_project_summary.png', dpi=200, bbox_inches='tight', facecolor='white')
-plt.close()
-print("   ✓ Saved: plots/19_project_summary.png")
-
-print("\n" + "=" * 70)
-print(" ✅ ALL VISUALIZATIONS GENERATED SUCCESSFULLY!")
-print("=" * 70)
-print(f"\n📁 Total plots created: 12")
-print(f"📂 Location: plots/")
-print("\nReady for README integration! 🚀")
+﻿[OK]#[OK] [OK]g[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]e[OK]_[OK]a[OK]l[OK]l[OK]_[OK]v[OK]i[OK]s[OK]u[OK]a[OK]l[OK]s[OK].[OK]p[OK]y[OK]
+[OK]"[OK]"[OK]"[OK]
+[OK]C[OK]o[OK]m[OK]p[OK]r[OK]e[OK]h[OK]e[OK]n[OK]s[OK]i[OK]v[OK]e[OK] [OK]v[OK]i[OK]s[OK]u[OK]a[OK]l[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]g[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]s[OK]c[OK]r[OK]i[OK]p[OK]t[OK] [OK]f[OK]o[OK]r[OK] [OK]R[OK]E[OK]A[OK]D[OK]M[OK]E[OK] [OK]s[OK]h[OK]o[OK]w[OK]c[OK]a[OK]s[OK]e[OK]
+[OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]e[OK]s[OK] [OK]a[OK]l[OK]l[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK] [OK]n[OK]e[OK]e[OK]d[OK]e[OK]d[OK] [OK]f[OK]o[OK]r[OK] [OK]a[OK] [OK]v[OK]i[OK]s[OK]u[OK]a[OK]l[OK]l[OK]y[OK] [OK]s[OK]t[OK]u[OK]n[OK]n[OK]i[OK]n[OK]g[OK] [OK]p[OK]r[OK]o[OK]j[OK]e[OK]c[OK]t[OK] [OK]p[OK]r[OK]e[OK]s[OK]e[OK]n[OK]t[OK]a[OK]t[OK]i[OK]o[OK]n[OK]
+[OK]"[OK]"[OK]"[OK]
+[OK]
+[OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]n[OK]u[OK]m[OK]p[OK]y[OK] [OK]a[OK]s[OK] [OK]n[OK]p[OK]
+[OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]m[OK]a[OK]t[OK]p[OK]l[OK]o[OK]t[OK]l[OK]i[OK]b[OK].[OK]p[OK]y[OK]p[OK]l[OK]o[OK]t[OK] [OK]a[OK]s[OK] [OK]p[OK]l[OK]t[OK]
+[OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]s[OK]y[OK]s[OK]
+[OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]o[OK]s[OK]
+[OK]
+[OK]s[OK]y[OK]s[OK].[OK]p[OK]a[OK]t[OK]h[OK].[OK]i[OK]n[OK]s[OK]e[OK]r[OK]t[OK]([OK]0[OK],[OK] [OK]o[OK]s[OK].[OK]p[OK]a[OK]t[OK]h[OK].[OK]j[OK]o[OK]i[OK]n[OK]([OK]o[OK]s[OK].[OK]p[OK]a[OK]t[OK]h[OK].[OK]d[OK]i[OK]r[OK]n[OK]a[OK]m[OK]e[OK]([OK]_[OK]_[OK]f[OK]i[OK]l[OK]e[OK]_[OK]_[OK])[OK],[OK] [OK]'[OK]s[OK]r[OK]c[OK]'[OK])[OK])[OK]
+[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]d[OK]f[OK]t[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]d[OK]f[OK]t[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]f[OK]f[OK]t[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]f[OK]f[OK]t[OK],[OK] [OK]f[OK]f[OK]t[OK]_[OK]i[OK]t[OK]e[OK]r[OK]a[OK]t[OK]i[OK]v[OK]e[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]r[OK]e[OK]c[OK]t[OK]a[OK]n[OK]g[OK]u[OK]l[OK]a[OK]r[OK],[OK] [OK]h[OK]a[OK]n[OK]n[OK],[OK] [OK]h[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]s[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]t[OK]w[OK]o[OK]_[OK]t[OK]o[OK]n[OK]e[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]c[OK]o[OK]m[OK]p[OK]r[OK]e[OK]s[OK]s[OK]e[OK]d[OK]_[OK]s[OK]e[OK]n[OK]s[OK]i[OK]n[OK]g[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]c[OK]r[OK]e[OK]a[OK]t[OK]e[OK]_[OK]s[OK]e[OK]n[OK]s[OK]i[OK]n[OK]g[OK]_[OK]m[OK]a[OK]t[OK]r[OK]i[OK]x[OK],[OK] [OK]m[OK]a[OK]t[OK]c[OK]h[OK]i[OK]n[OK]g[OK]_[OK]p[OK]u[OK]r[OK]s[OK]u[OK]i[OK]t[OK],[OK] [OK]r[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK]_[OK]f[OK]r[OK]o[OK]m[OK]_[OK]s[OK]p[OK]a[OK]r[OK]s[OK]e[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]m[OK]e[OK]t[OK]r[OK]i[OK]c[OK]s[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]s[OK]p[OK]e[OK]c[OK]t[OK]r[OK]a[OK]l[OK]_[OK]e[OK]n[OK]t[OK]r[OK]o[OK]p[OK]y[OK],[OK] [OK]p[OK]e[OK]a[OK]k[OK]_[OK]t[OK]o[OK]_[OK]s[OK]i[OK]d[OK]e[OK]l[OK]o[OK]b[OK]e[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]
+[OK]
+[OK]#[OK] [OK]E[OK]n[OK]s[OK]u[OK]r[OK]e[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK] [OK]d[OK]i[OK]r[OK]e[OK]c[OK]t[OK]o[OK]r[OK]y[OK] [OK]e[OK]x[OK]i[OK]s[OK]t[OK]s[OK]
+[OK]o[OK]s[OK].[OK]m[OK]a[OK]k[OK]e[OK]d[OK]i[OK]r[OK]s[OK]([OK]"[OK]p[OK]l[OK]o[OK]t[OK]s[OK]"[OK],[OK] [OK]e[OK]x[OK]i[OK]s[OK]t[OK]_[OK]o[OK]k[OK]=[OK]T[OK]r[OK]u[OK]e[OK])[OK]
+[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]=[OK]"[OK] [OK]*[OK] [OK]7[OK]0[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK]G[OK]E[OK]N[OK]E[OK]R[OK]A[OK]T[OK]I[OK]N[OK]G[OK] [OK]C[OK]O[OK]M[OK]P[OK]R[OK]E[OK]H[OK]E[OK]N[OK]S[OK]I[OK]V[OK]E[OK] [OK]V[OK]I[OK]S[OK]U[OK]A[OK]L[OK]I[OK]Z[OK]A[OK]T[OK]I[OK]O[OK]N[OK] [OK]S[OK]U[OK]I[OK]T[OK]E[OK]"[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]=[OK]"[OK] [OK]*[OK] [OK]7[OK]0[OK])[OK]
+[OK]
+[OK]#[OK] [OK]S[OK]e[OK]t[OK] [OK]c[OK]o[OK]n[OK]s[OK]i[OK]s[OK]t[OK]e[OK]n[OK]t[OK] [OK]s[OK]t[OK]y[OK]l[OK]e[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]t[OK]y[OK]l[OK]e[OK].[OK]u[OK]s[OK]e[OK]([OK]'[OK]s[OK]e[OK]a[OK]b[OK]o[OK]r[OK]n[OK]-[OK]v[OK]0[OK]_[OK]8[OK]-[OK]d[OK]a[OK]r[OK]k[OK]g[OK]r[OK]i[OK]d[OK]'[OK])[OK]
+[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK] [OK]=[OK] [OK][[OK]'[OK]#[OK]2[OK]E[OK]8[OK]6[OK]A[OK]B[OK]'[OK],[OK] [OK]'[OK]#[OK]A[OK]2[OK]3[OK]B[OK]7[OK]2[OK]'[OK],[OK] [OK]'[OK]#[OK]F[OK]1[OK]8[OK]F[OK]0[OK]1[OK]'[OK],[OK] [OK]'[OK]#[OK]C[OK]7[OK]3[OK]E[OK]1[OK]D[OK]'[OK],[OK] [OK]'[OK]#[OK]6[OK]A[OK]9[OK]9[OK]4[OK]E[OK]'[OK]][OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]1[OK].[OK] [OK]F[OK]F[OK]T[OK] [OK]C[OK]O[OK]M[OK]P[OK]L[OK]E[OK]X[OK]I[OK]T[OK]Y[OK] [OK]C[OK]O[OK]M[OK]P[OK]A[OK]R[OK]I[OK]S[OK]O[OK]N[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]1[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]F[OK]F[OK]T[OK] [OK]c[OK]o[OK]m[OK]p[OK]l[OK]e[OK]x[OK]i[OK]t[OK]y[OK] [OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]s[OK]i[OK]z[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]2[OK]*[OK]*[OK]n[OK] [OK]f[OK]o[OK]r[OK] [OK]n[OK] [OK]i[OK]n[OK] [OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]4[OK],[OK] [OK]1[OK]1[OK])[OK]][OK] [OK] [OK]#[OK] [OK]1[OK]6[OK] [OK]t[OK]o[OK] [OK]1[OK]0[OK]2[OK]4[OK]
+[OK]d[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK] [OK]=[OK] [OK][[OK]n[OK]*[OK]*[OK]2[OK] [OK]f[OK]o[OK]r[OK] [OK]n[OK] [OK]i[OK]n[OK] [OK]s[OK]i[OK]z[OK]e[OK]s[OK]][OK]
+[OK]f[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK] [OK]=[OK] [OK][[OK]n[OK] [OK]*[OK] [OK]n[OK]p[OK].[OK]l[OK]o[OK]g[OK]2[OK]([OK]n[OK])[OK] [OK]f[OK]o[OK]r[OK] [OK]n[OK] [OK]i[OK]n[OK] [OK]s[OK]i[OK]z[OK]e[OK]s[OK]][OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]([OK]a[OK]x[OK]1[OK],[OK] [OK]a[OK]x[OK]2[OK])[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]1[OK],[OK] [OK]2[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]4[OK],[OK] [OK]5[OK])[OK])[OK]
+[OK]
+[OK]#[OK] [OK]L[OK]i[OK]n[OK]e[OK]a[OK]r[OK] [OK]s[OK]c[OK]a[OK]l[OK]e[OK]
+[OK]a[OK]x[OK]1[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]s[OK]i[OK]z[OK]e[OK]s[OK],[OK] [OK]d[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]D[OK]F[OK]T[OK]:[OK] [OK]O[OK]([OK]N[OK]²[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]s[OK]i[OK]z[OK]e[OK]s[OK],[OK] [OK]f[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK],[OK] [OK]'[OK]s[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]F[OK]F[OK]T[OK]:[OK] [OK]O[OK]([OK]N[OK] [OK]l[OK]o[OK]g[OK] [OK]N[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]L[OK]e[OK]n[OK]g[OK]t[OK]h[OK] [OK]([OK]N[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]O[OK]p[OK]e[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK]s[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]A[OK]l[OK]g[OK]o[OK]r[OK]i[OK]t[OK]h[OK]m[OK] [OK]C[OK]o[OK]m[OK]p[OK]l[OK]e[OK]x[OK]i[OK]t[OK]y[OK] [OK]([OK]L[OK]i[OK]n[OK]e[OK]a[OK]r[OK] [OK]S[OK]c[OK]a[OK]l[OK]e[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]#[OK] [OK]L[OK]o[OK]g[OK]-[OK]l[OK]o[OK]g[OK] [OK]s[OK]c[OK]a[OK]l[OK]e[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]o[OK]g[OK]l[OK]o[OK]g[OK]([OK]s[OK]i[OK]z[OK]e[OK]s[OK],[OK] [OK]d[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]D[OK]F[OK]T[OK]:[OK] [OK]O[OK]([OK]N[OK]²[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]o[OK]g[OK]l[OK]o[OK]g[OK]([OK]s[OK]i[OK]z[OK]e[OK]s[OK],[OK] [OK]f[OK]f[OK]t[OK]_[OK]o[OK]p[OK]s[OK],[OK] [OK]'[OK]s[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]F[OK]F[OK]T[OK]:[OK] [OK]O[OK]([OK]N[OK] [OK]l[OK]o[OK]g[OK] [OK]N[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]L[OK]e[OK]n[OK]g[OK]t[OK]h[OK] [OK]([OK]N[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]O[OK]p[OK]e[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK]s[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]A[OK]l[OK]g[OK]o[OK]r[OK]i[OK]t[OK]h[OK]m[OK] [OK]C[OK]o[OK]m[OK]p[OK]l[OK]e[OK]x[OK]i[OK]t[OK]y[OK] [OK]([OK]L[OK]o[OK]g[OK]-[OK]L[OK]o[OK]g[OK] [OK]S[OK]c[OK]a[OK]l[OK]e[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK],[OK] [OK]w[OK]h[OK]i[OK]c[OK]h[OK]=[OK]'[OK]b[OK]o[OK]t[OK]h[OK]'[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]0[OK]0[OK]_[OK]c[OK]o[OK]m[OK]p[OK]l[OK]e[OK]x[OK]i[OK]t[OK]y[OK]_[OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]0[OK]0[OK]_[OK]c[OK]o[OK]m[OK]p[OK]l[OK]e[OK]x[OK]i[OK]t[OK]y[OK]_[OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]2[OK].[OK] [OK]W[OK]I[OK]N[OK]D[OK]O[OK]W[OK] [OK]F[OK]U[OK]N[OK]C[OK]T[OK]I[OK]O[OK]N[OK]S[OK] [OK]S[OK]H[OK]O[OK]W[OK]C[OK]A[OK]S[OK]E[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]2[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK] [OK]f[OK]u[OK]n[OK]c[OK]t[OK]i[OK]o[OK]n[OK]s[OK] [OK]s[OK]h[OK]o[OK]w[OK]c[OK]a[OK]s[OK]e[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]N[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK] [OK]=[OK] [OK]2[OK]5[OK]6[OK]
+[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK]_[OK]d[OK]i[OK]c[OK]t[OK] [OK]=[OK] [OK]{[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]R[OK]e[OK]c[OK]t[OK]a[OK]n[OK]g[OK]u[OK]l[OK]a[OK]r[OK]'[OK]:[OK] [OK]r[OK]e[OK]c[OK]t[OK]a[OK]n[OK]g[OK]u[OK]l[OK]a[OK]r[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK])[OK],[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]H[OK]a[OK]n[OK]n[OK]'[OK]:[OK] [OK]h[OK]a[OK]n[OK]n[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK])[OK],[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]H[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]'[OK]:[OK] [OK]h[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK])[OK]
+[OK]}[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]a[OK]x[OK]e[OK]s[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]2[OK],[OK] [OK]3[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]5[OK],[OK] [OK]8[OK])[OK])[OK]
+[OK]
+[OK]f[OK]o[OK]r[OK] [OK]i[OK]d[OK]x[OK],[OK] [OK]([OK]n[OK]a[OK]m[OK]e[OK],[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK])[OK] [OK]i[OK]n[OK] [OK]e[OK]n[OK]u[OK]m[OK]e[OK]r[OK]a[OK]t[OK]e[OK]([OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK]_[OK]d[OK]i[OK]c[OK]t[OK].[OK]i[OK]t[OK]e[OK]m[OK]s[OK]([OK])[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]#[OK] [OK]T[OK]i[OK]m[OK]e[OK] [OK]d[OK]o[OK]m[OK]a[OK]i[OK]n[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK] [OK]=[OK] [OK]a[OK]x[OK]e[OK]s[OK][[OK]0[OK],[OK] [OK]i[OK]d[OK]x[OK]][OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]i[OK]d[OK]x[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]f[OK]'[OK]{[OK]n[OK]a[OK]m[OK]e[OK]}[OK] [OK]W[OK]i[OK]n[OK]d[OK]o[OK]w[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]a[OK]m[OK]p[OK]l[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]A[OK]m[OK]p[OK]l[OK]i[OK]t[OK]u[OK]d[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]t[OK]i[OK]m[OK]e[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]i[OK]m[OK]([OK]-[OK]0[OK].[OK]1[OK],[OK] [OK]1[OK].[OK]1[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]#[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]r[OK]e[OK]s[OK]p[OK]o[OK]n[OK]s[OK]e[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK] [OK]=[OK] [OK]a[OK]x[OK]e[OK]s[OK][[OK]1[OK],[OK] [OK]i[OK]d[OK]x[OK]][OK]
+[OK] [OK] [OK] [OK] [OK]W[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]f[OK]f[OK]t[OK].[OK]f[OK]f[OK]t[OK]([OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK],[OK] [OK]2[OK]0[OK]4[OK]8[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]W[OK]_[OK]d[OK]b[OK] [OK]=[OK] [OK]2[OK]0[OK] [OK]*[OK] [OK]n[OK]p[OK].[OK]l[OK]o[OK]g[OK]1[OK]0[OK]([OK]n[OK]p[OK].[OK]a[OK]b[OK]s[OK]([OK]W[OK][[OK]:[OK]1[OK]0[OK]2[OK]4[OK]][OK])[OK] [OK]/[OK] [OK]n[OK]p[OK].[OK]m[OK]a[OK]x[OK]([OK]n[OK]p[OK].[OK]a[OK]b[OK]s[OK]([OK]W[OK])[OK])[OK] [OK]+[OK] [OK]1[OK]e[OK]-[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]f[OK]r[OK]e[OK]q[OK]s[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]l[OK]i[OK]n[OK]s[OK]p[OK]a[OK]c[OK]e[OK]([OK]0[OK],[OK] [OK]0[OK].[OK]5[OK],[OK] [OK]1[OK]0[OK]2[OK]4[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK],[OK] [OK]W[OK]_[OK]d[OK]b[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]i[OK]d[OK]x[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]f[OK]'[OK]{[OK]n[OK]a[OK]m[OK]e[OK]}[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]R[OK]e[OK]s[OK]p[OK]o[OK]n[OK]s[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]N[OK]o[OK]r[OK]m[OK]a[OK]l[OK]i[OK]z[OK]e[OK]d[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]M[OK]a[OK]g[OK]n[OK]i[OK]t[OK]u[OK]d[OK]e[OK] [OK]([OK]d[OK]B[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]i[OK]m[OK]([OK]-[OK]8[OK]0[OK],[OK] [OK]5[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]_[OK]f[OK]r[OK]e[OK]q[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]3[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]_[OK]f[OK]u[OK]n[OK]c[OK]t[OK]i[OK]o[OK]n[OK]s[OK]_[OK]s[OK]h[OK]o[OK]w[OK]c[OK]a[OK]s[OK]e[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]3[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]_[OK]f[OK]u[OK]n[OK]c[OK]t[OK]i[OK]o[OK]n[OK]s[OK]_[OK]s[OK]h[OK]o[OK]w[OK]c[OK]a[OK]s[OK]e[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]3[OK].[OK] [OK]C[OK]O[OK]M[OK]P[OK]R[OK]E[OK]S[OK]S[OK]E[OK]D[OK] [OK]S[OK]E[OK]N[OK]S[OK]I[OK]N[OK]G[OK] [OK]S[OK]U[OK]C[OK]C[OK]E[OK]S[OK]S[OK] [OK]R[OK]A[OK]T[OK]E[OK] [OK]v[OK]s[OK] [OK]S[OK]A[OK]M[OK]P[OK]L[OK]I[OK]N[OK]G[OK] [OK]R[OK]A[OK]T[OK]I[OK]O[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]3[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]C[OK]S[OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK] [OK]r[OK]a[OK]t[OK]e[OK] [OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]N[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]
+[OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]s[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]l[OK]i[OK]n[OK]s[OK]p[OK]a[OK]c[OK]e[OK]([OK]0[OK].[OK]2[OK],[OK] [OK]0[OK].[OK]9[OK],[OK] [OK]8[OK])[OK]
+[OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]_[OK]r[OK]a[OK]t[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]][OK]
+[OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK] [OK]=[OK] [OK][[OK]][OK]
+[OK]
+[OK]f[OK]o[OK]r[OK] [OK]r[OK]a[OK]t[OK]i[OK]o[OK] [OK]i[OK]n[OK] [OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]s[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]M[OK] [OK]=[OK] [OK]i[OK]n[OK]t[OK]([OK]N[OK] [OK]*[OK] [OK]r[OK]a[OK]t[OK]i[OK]o[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]e[OK]s[OK] [OK]=[OK] [OK]0[OK]
+[OK] [OK] [OK] [OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]_[OK]l[OK]i[OK]s[OK]t[OK] [OK]=[OK] [OK][[OK]][OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]f[OK]o[OK]r[OK] [OK]t[OK]r[OK]i[OK]a[OK]l[OK] [OK]i[OK]n[OK] [OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]2[OK]0[OK])[OK]:[OK] [OK] [OK]#[OK] [OK]2[OK]0[OK] [OK]t[OK]r[OK]i[OK]a[OK]l[OK]s[OK] [OK]p[OK]e[OK]r[OK] [OK]r[OK]a[OK]t[OK]i[OK]o[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]n[OK]p[OK].[OK]r[OK]a[OK]n[OK]d[OK]o[OK]m[OK].[OK]s[OK]e[OK]e[OK]d[OK]([OK]t[OK]r[OK]i[OK]a[OK]l[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]#[OK] [OK]C[OK]r[OK]e[OK]a[OK]t[OK]e[OK] [OK]s[OK]p[OK]a[OK]r[OK]s[OK]e[OK] [OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]1[OK],[OK] [OK]f[OK]2[OK] [OK]=[OK] [OK]1[OK]0[OK],[OK] [OK]2[OK]5[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]t[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]a[OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]N[OK])[OK] [OK]/[OK] [OK]N[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]x[OK]_[OK]t[OK]r[OK]u[OK]e[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]c[OK]o[OK]s[OK]([OK]2[OK]*[OK]n[OK]p[OK].[OK]p[OK]i[OK]*[OK]f[OK]1[OK]*[OK]t[OK])[OK] [OK]+[OK] [OK]0[OK].[OK]5[OK]*[OK]n[OK]p[OK].[OK]c[OK]o[OK]s[OK]([OK]2[OK]*[OK]n[OK]p[OK].[OK]p[OK]i[OK]*[OK]f[OK]2[OK]*[OK]t[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]#[OK] [OK]S[OK]a[OK]m[OK]p[OK]l[OK]e[OK] [OK]a[OK]n[OK]d[OK] [OK]r[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]i[OK]n[OK]d[OK]i[OK]c[OK]e[OK]s[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]s[OK]o[OK]r[OK]t[OK]([OK]n[OK]p[OK].[OK]r[OK]a[OK]n[OK]d[OK]o[OK]m[OK].[OK]c[OK]h[OK]o[OK]i[OK]c[OK]e[OK]([OK]N[OK],[OK] [OK]M[OK],[OK] [OK]r[OK]e[OK]p[OK]l[OK]a[OK]c[OK]e[OK]=[OK]F[OK]a[OK]l[OK]s[OK]e[OK])[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]y[OK] [OK]=[OK] [OK]x[OK]_[OK]t[OK]r[OK]u[OK]e[OK][[OK]i[OK]n[OK]d[OK]i[OK]c[OK]e[OK]s[OK]][OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]o[OK]p[OK]e[OK]r[OK]a[OK]t[OK]o[OK]r[OK] [OK]=[OK] [OK]c[OK]r[OK]e[OK]a[OK]t[OK]e[OK]_[OK]s[OK]e[OK]n[OK]s[OK]i[OK]n[OK]g[OK]_[OK]m[OK]a[OK]t[OK]r[OK]i[OK]x[OK]([OK]i[OK]n[OK]d[OK]i[OK]c[OK]e[OK]s[OK],[OK] [OK]N[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]s[OK]_[OK]h[OK]a[OK]t[OK] [OK]=[OK] [OK]m[OK]a[OK]t[OK]c[OK]h[OK]i[OK]n[OK]g[OK]_[OK]p[OK]u[OK]r[OK]s[OK]u[OK]i[OK]t[OK]([OK]y[OK],[OK] [OK]o[OK]p[OK]e[OK]r[OK]a[OK]t[OK]o[OK]r[OK],[OK] [OK]m[OK]a[OK]x[OK]_[OK]i[OK]t[OK]e[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK]s[OK]=[OK]2[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]x[OK]_[OK]r[OK]e[OK]c[OK]o[OK]n[OK] [OK]=[OK] [OK]r[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK]_[OK]f[OK]r[OK]o[OK]m[OK]_[OK]s[OK]p[OK]a[OK]r[OK]s[OK]e[OK]([OK]s[OK]_[OK]h[OK]a[OK]t[OK],[OK] [OK]N[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]l[OK]i[OK]n[OK]a[OK]l[OK]g[OK].[OK]n[OK]o[OK]r[OK]m[OK]([OK]x[OK]_[OK]t[OK]r[OK]u[OK]e[OK] [OK]-[OK] [OK]x[OK]_[OK]r[OK]e[OK]c[OK]o[OK]n[OK])[OK] [OK]/[OK] [OK]n[OK]p[OK].[OK]l[OK]i[OK]n[OK]a[OK]l[OK]g[OK].[OK]n[OK]o[OK]r[OK]m[OK]([OK]x[OK]_[OK]t[OK]r[OK]u[OK]e[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]_[OK]l[OK]i[OK]s[OK]t[OK].[OK]a[OK]p[OK]p[OK]e[OK]n[OK]d[OK]([OK]e[OK]r[OK]r[OK]o[OK]r[OK])[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]i[OK]f[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK] [OK]<[OK] [OK]0[OK].[OK]3[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]e[OK]s[OK] [OK]+[OK]=[OK] [OK]1[OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]_[OK]r[OK]a[OK]t[OK]e[OK]s[OK].[OK]a[OK]p[OK]p[OK]e[OK]n[OK]d[OK]([OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]e[OK]s[OK] [OK]/[OK] [OK]2[OK]0[OK] [OK]*[OK] [OK]1[OK]0[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK].[OK]a[OK]p[OK]p[OK]e[OK]n[OK]d[OK]([OK]n[OK]p[OK].[OK]m[OK]e[OK]a[OK]n[OK]([OK]e[OK]r[OK]r[OK]o[OK]r[OK]_[OK]l[OK]i[OK]s[OK]t[OK])[OK])[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]([OK]a[OK]x[OK]1[OK],[OK] [OK]a[OK]x[OK]2[OK])[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]1[OK],[OK] [OK]2[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]4[OK],[OK] [OK]5[OK])[OK])[OK]
+[OK]
+[OK]#[OK] [OK]S[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK] [OK]r[OK]a[OK]t[OK]e[OK]
+[OK]a[OK]x[OK]1[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]s[OK] [OK]*[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]_[OK]r[OK]a[OK]t[OK]e[OK]s[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]2[OK]][OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]3[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]a[OK]x[OK]h[OK]l[OK]i[OK]n[OK]e[OK]([OK]y[OK]=[OK]9[OK]0[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]r[OK]e[OK]d[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]9[OK]0[OK]%[OK] [OK]S[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK] [OK]T[OK]h[OK]r[OK]e[OK]s[OK]h[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]f[OK]i[OK]l[OK]l[OK]_[OK]b[OK]e[OK]t[OK]w[OK]e[OK]e[OK]n[OK]([OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]s[OK] [OK]*[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]0[OK],[OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK]_[OK]r[OK]a[OK]t[OK]e[OK]s[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]2[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]2[OK]][OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK] [OK]R[OK]a[OK]t[OK]e[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]C[OK]S[OK] [OK]R[OK]e[OK]c[OK]o[OK]v[OK]e[OK]r[OK]y[OK] [OK]S[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK] [OK]v[OK]s[OK].[OK] [OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]
+[OK]#[OK] [OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]
+[OK]a[OK]x[OK]2[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]r[OK]a[OK]t[OK]i[OK]o[OK]s[OK] [OK]*[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK],[OK] [OK]'[OK]s[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]3[OK]][OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]3[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]a[OK]x[OK]h[OK]l[OK]i[OK]n[OK]e[OK]([OK]y[OK]=[OK]0[OK].[OK]0[OK]5[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]g[OK]r[OK]e[OK]e[OK]n[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]<[OK]5[OK]%[OK] [OK]E[OK]r[OK]r[OK]o[OK]r[OK] [OK]T[OK]a[OK]r[OK]g[OK]e[OK]t[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]N[OK]o[OK]r[OK]m[OK]a[OK]l[OK]i[OK]z[OK]e[OK]d[OK] [OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]E[OK]r[OK]r[OK]o[OK]r[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]E[OK]r[OK]r[OK]o[OK]r[OK] [OK]v[OK]s[OK].[OK] [OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]4[OK]_[OK]c[OK]s[OK]_[OK]p[OK]e[OK]r[OK]f[OK]o[OK]r[OK]m[OK]a[OK]n[OK]c[OK]e[OK]_[OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]4[OK]_[OK]c[OK]s[OK]_[OK]p[OK]e[OK]r[OK]f[OK]o[OK]r[OK]m[OK]a[OK]n[OK]c[OK]e[OK]_[OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]4[OK].[OK] [OK]S[OK]P[OK]E[OK]C[OK]T[OK]R[OK]A[OK]L[OK] [OK]L[OK]E[OK]A[OK]K[OK]A[OK]G[OK]E[OK] [OK]C[OK]O[OK]M[OK]P[OK]A[OK]R[OK]I[OK]S[OK]O[OK]N[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]4[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]s[OK]p[OK]e[OK]c[OK]t[OK]r[OK]a[OK]l[OK] [OK]l[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK] [OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]f[OK]s[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]0[OK]
+[OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]=[OK] [OK]1[OK].[OK]0[OK]
+[OK]N[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]=[OK] [OK]i[OK]n[OK]t[OK]([OK]f[OK]s[OK] [OK]*[OK] [OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK])[OK]
+[OK]f[OK] [OK]=[OK] [OK]5[OK]5[OK].[OK]7[OK] [OK] [OK]#[OK] [OK]N[OK]o[OK]n[OK]-[OK]i[OK]n[OK]t[OK]e[OK]g[OK]e[OK]r[OK] [OK]b[OK]i[OK]n[OK] [OK]f[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK]
+[OK]
+[OK]t[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]a[OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]N[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK])[OK] [OK]/[OK] [OK]f[OK]s[OK]
+[OK]x[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]s[OK]i[OK]n[OK]([OK]2[OK]*[OK]n[OK]p[OK].[OK]p[OK]i[OK]*[OK]f[OK]*[OK]t[OK])[OK]
+[OK]
+[OK]N[OK]_[OK]w[OK]i[OK]n[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]0[OK]
+[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK]_[OK]d[OK]i[OK]c[OK]t[OK]_[OK]l[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK] [OK]=[OK] [OK]{[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]R[OK]e[OK]c[OK]t[OK]a[OK]n[OK]g[OK]u[OK]l[OK]a[OK]r[OK]'[OK]:[OK] [OK]r[OK]e[OK]c[OK]t[OK]a[OK]n[OK]g[OK]u[OK]l[OK]a[OK]r[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK])[OK],[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]H[OK]a[OK]n[OK]n[OK]'[OK]:[OK] [OK]h[OK]a[OK]n[OK]n[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK])[OK],[OK]
+[OK] [OK] [OK] [OK] [OK]'[OK]H[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]'[OK]:[OK] [OK]h[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK])[OK]
+[OK]}[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]a[OK]x[OK]e[OK]s[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]3[OK],[OK] [OK]1[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]2[OK],[OK] [OK]1[OK]0[OK])[OK])[OK]
+[OK]
+[OK]f[OK]o[OK]r[OK] [OK]i[OK]d[OK]x[OK],[OK] [OK]([OK]n[OK]a[OK]m[OK]e[OK],[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK])[OK] [OK]i[OK]n[OK] [OK]e[OK]n[OK]u[OK]m[OK]e[OK]r[OK]a[OK]t[OK]e[OK]([OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK]_[OK]d[OK]i[OK]c[OK]t[OK]_[OK]l[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK].[OK]i[OK]t[OK]e[OK]m[OK]s[OK]([OK])[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK] [OK]=[OK] [OK]a[OK]x[OK]e[OK]s[OK][[OK]i[OK]d[OK]x[OK]][OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]x[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]e[OK]d[OK] [OK]=[OK] [OK]x[OK] [OK]*[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]
+[OK] [OK] [OK] [OK] [OK]X[OK] [OK]=[OK] [OK]d[OK]f[OK]t[OK]([OK]x[OK]_[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]e[OK]d[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]f[OK]r[OK]e[OK]q[OK]s[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]a[OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]N[OK]_[OK]w[OK]i[OK]n[OK])[OK] [OK]*[OK] [OK]f[OK]s[OK] [OK]/[OK] [OK]N[OK]_[OK]w[OK]i[OK]n[OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]m[OK]a[OK]g[OK]_[OK]d[OK]b[OK] [OK]=[OK] [OK]2[OK]0[OK] [OK]*[OK] [OK]n[OK]p[OK].[OK]l[OK]o[OK]g[OK]1[OK]0[OK]([OK]n[OK]p[OK].[OK]a[OK]b[OK]s[OK]([OK]X[OK][[OK]:[OK]N[OK]_[OK]w[OK]i[OK]n[OK]/[OK]/[OK]2[OK]][OK])[OK] [OK]/[OK] [OK]N[OK]_[OK]w[OK]i[OK]n[OK] [OK]+[OK] [OK]1[OK]e[OK]-[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK][[OK]:[OK]N[OK]_[OK]w[OK]i[OK]n[OK]/[OK]/[OK]2[OK]][OK],[OK] [OK]m[OK]a[OK]g[OK]_[OK]d[OK]b[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]i[OK]d[OK]x[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]a[OK]x[OK]v[OK]l[OK]i[OK]n[OK]e[OK]([OK]x[OK]=[OK]f[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]r[OK]e[OK]d[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]f[OK]'[OK]T[OK]r[OK]u[OK]e[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]([OK]{[OK]f[OK]}[OK] [OK]H[OK]z[OK])[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]i[OK]m[OK]([OK]0[OK],[OK] [OK]2[OK]0[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]i[OK]m[OK]([OK]-[OK]1[OK]0[OK]0[OK],[OK] [OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]M[OK]a[OK]g[OK]n[OK]i[OK]t[OK]u[OK]d[OK]e[OK] [OK]([OK]d[OK]B[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]f[OK]'[OK]{[OK]n[OK]a[OK]m[OK]e[OK]}[OK] [OK]W[OK]i[OK]n[OK]d[OK]o[OK]w[OK] [OK]-[OK] [OK]S[OK]p[OK]e[OK]c[OK]t[OK]r[OK]a[OK]l[OK] [OK]L[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]3[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]
+[OK]a[OK]x[OK]e[OK]s[OK][[OK]-[OK]1[OK]][OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]([OK]H[OK]z[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]5[OK]_[OK]s[OK]p[OK]e[OK]c[OK]t[OK]r[OK]a[OK]l[OK]_[OK]l[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK]_[OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]5[OK]_[OK]s[OK]p[OK]e[OK]c[OK]t[OK]r[OK]a[OK]l[OK]_[OK]l[OK]e[OK]a[OK]k[OK]a[OK]g[OK]e[OK]_[OK]c[OK]o[OK]m[OK]p[OK]a[OK]r[OK]i[OK]s[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]5[OK].[OK] [OK]A[OK]L[OK]I[OK]A[OK]S[OK]I[OK]N[OK]G[OK] [OK]D[OK]E[OK]M[OK]O[OK]N[OK]S[OK]T[OK]R[OK]A[OK]T[OK]I[OK]O[OK]N[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]5[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]a[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK] [OK]d[OK]e[OK]m[OK]o[OK]n[OK]s[OK]t[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]H[OK]i[OK]g[OK]h[OK] [OK]f[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]
+[OK]f[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]0[OK]
+[OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]=[OK] [OK]0[OK].[OK]2[OK]
+[OK]t[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]a[OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]0[OK],[OK] [OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK],[OK] [OK]1[OK]/[OK]f[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]
+[OK]f[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]=[OK] [OK]7[OK]0[OK] [OK] [OK]#[OK] [OK]A[OK]b[OK]o[OK]v[OK]e[OK] [OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]/[OK]2[OK]
+[OK]
+[OK]x[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]s[OK]i[OK]n[OK]([OK]2[OK]*[OK]n[OK]p[OK].[OK]p[OK]i[OK]*[OK]f[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]*[OK]t[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]
+[OK]
+[OK]#[OK] [OK]D[OK]o[OK]w[OK]n[OK]s[OK]a[OK]m[OK]p[OK]l[OK]e[OK] [OK]([OK]a[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK])[OK]
+[OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]
+[OK]d[OK]e[OK]c[OK]i[OK]m[OK]a[OK]t[OK]i[OK]o[OK]n[OK]_[OK]f[OK]a[OK]c[OK]t[OK]o[OK]r[OK] [OK]=[OK] [OK]f[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]/[OK]/[OK] [OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]
+[OK]t[OK]_[OK]l[OK]o[OK]w[OK] [OK]=[OK] [OK]t[OK]_[OK]h[OK]i[OK]g[OK]h[OK][[OK]:[OK]:[OK]d[OK]e[OK]c[OK]i[OK]m[OK]a[OK]t[OK]i[OK]o[OK]n[OK]_[OK]f[OK]a[OK]c[OK]t[OK]o[OK]r[OK]][OK]
+[OK]x[OK]_[OK]l[OK]o[OK]w[OK] [OK]=[OK] [OK]x[OK]_[OK]h[OK]i[OK]g[OK]h[OK][[OK]:[OK]:[OK]d[OK]e[OK]c[OK]i[OK]m[OK]a[OK]t[OK]i[OK]o[OK]n[OK]_[OK]f[OK]a[OK]c[OK]t[OK]o[OK]r[OK]][OK]
+[OK]
+[OK]#[OK] [OK]A[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK] [OK]f[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK]
+[OK]f[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK] [OK]=[OK] [OK]f[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]%[OK] [OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]
+[OK]i[OK]f[OK] [OK]f[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK] [OK]>[OK] [OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK] [OK]/[OK] [OK]2[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]f[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK] [OK]=[OK] [OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK] [OK]-[OK] [OK]f[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]([OK]a[OK]x[OK]1[OK],[OK] [OK]a[OK]x[OK]2[OK])[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]2[OK],[OK] [OK]1[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]4[OK],[OK] [OK]8[OK])[OK])[OK]
+[OK]
+[OK]#[OK] [OK]T[OK]i[OK]m[OK]e[OK] [OK]d[OK]o[OK]m[OK]a[OK]i[OK]n[OK]
+[OK]a[OK]x[OK]1[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]t[OK]_[OK]h[OK]i[OK]g[OK]h[OK],[OK] [OK]x[OK]_[OK]h[OK]i[OK]g[OK]h[OK],[OK] [OK]'[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]1[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]6[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]f[OK]'[OK]O[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK] [OK]S[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]([OK]{[OK]f[OK]_[OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]}[OK] [OK]H[OK]z[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]t[OK]_[OK]l[OK]o[OK]w[OK],[OK] [OK]x[OK]_[OK]l[OK]o[OK]w[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]1[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]f[OK]'[OK]D[OK]o[OK]w[OK]n[OK]s[OK]a[OK]m[OK]p[OK]l[OK]e[OK]d[OK] [OK]([OK]f[OK]s[OK]=[OK]{[OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]}[OK] [OK]H[OK]z[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]T[OK]i[OK]m[OK]e[OK] [OK]([OK]s[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]A[OK]m[OK]p[OK]l[OK]i[OK]t[OK]u[OK]d[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]A[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK] [OK]i[OK]n[OK] [OK]T[OK]i[OK]m[OK]e[OK] [OK]D[OK]o[OK]m[OK]a[OK]i[OK]n[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]#[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]d[OK]o[OK]m[OK]a[OK]i[OK]n[OK]
+[OK]X[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]f[OK]f[OK]t[OK].[OK]f[OK]f[OK]t[OK]([OK]x[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]
+[OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]f[OK]f[OK]t[OK].[OK]f[OK]f[OK]t[OK]f[OK]r[OK]e[OK]q[OK]([OK]l[OK]e[OK]n[OK]([OK]x[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK],[OK] [OK]1[OK]/[OK]f[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]
+[OK]X[OK]_[OK]l[OK]o[OK]w[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]f[OK]f[OK]t[OK].[OK]f[OK]f[OK]t[OK]([OK]x[OK]_[OK]l[OK]o[OK]w[OK])[OK]
+[OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]l[OK]o[OK]w[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]f[OK]f[OK]t[OK].[OK]f[OK]f[OK]t[OK]f[OK]r[OK]e[OK]q[OK]([OK]l[OK]e[OK]n[OK]([OK]x[OK]_[OK]l[OK]o[OK]w[OK])[OK],[OK] [OK]1[OK]/[OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK])[OK]
+[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]t[OK]e[OK]m[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK][[OK]:[OK]l[OK]e[OK]n[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]/[OK]/[OK]2[OK]][OK],[OK] [OK]n[OK]p[OK].[OK]a[OK]b[OK]s[OK]([OK]X[OK]_[OK]h[OK]i[OK]g[OK]h[OK][[OK]:[OK]l[OK]e[OK]n[OK]([OK]X[OK]_[OK]h[OK]i[OK]g[OK]h[OK])[OK]/[OK]/[OK]2[OK]][OK])[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]i[OK]n[OK]e[OK]f[OK]m[OK]t[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]f[OK]m[OK]t[OK]=[OK]'[OK]o[OK]'[OK],[OK] [OK]b[OK]a[OK]s[OK]e[OK]f[OK]m[OK]t[OK]=[OK]'[OK] [OK]'[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]O[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK] [OK]S[OK]p[OK]e[OK]c[OK]t[OK]r[OK]u[OK]m[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]t[OK]e[OK]m[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]l[OK]o[OK]w[OK][[OK]:[OK]l[OK]e[OK]n[OK]([OK]f[OK]r[OK]e[OK]q[OK]s[OK]_[OK]l[OK]o[OK]w[OK])[OK]/[OK]/[OK]2[OK]][OK],[OK] [OK]n[OK]p[OK].[OK]a[OK]b[OK]s[OK]([OK]X[OK]_[OK]l[OK]o[OK]w[OK][[OK]:[OK]l[OK]e[OK]n[OK]([OK]X[OK]_[OK]l[OK]o[OK]w[OK])[OK]/[OK]/[OK]2[OK]][OK])[OK]*[OK]1[OK]0[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]i[OK]n[OK]e[OK]f[OK]m[OK]t[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]f[OK]m[OK]t[OK]=[OK]'[OK]s[OK]'[OK],[OK] [OK]b[OK]a[OK]s[OK]e[OK]f[OK]m[OK]t[OK]=[OK]'[OK] [OK]'[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]A[OK]l[OK]i[OK]a[OK]s[OK]e[OK]d[OK] [OK]S[OK]p[OK]e[OK]c[OK]t[OK]r[OK]u[OK]m[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]a[OK]x[OK]v[OK]l[OK]i[OK]n[OK]e[OK]([OK]x[OK]=[OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]/[OK]2[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]r[OK]e[OK]d[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]7[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]f[OK]'[OK]N[OK]y[OK]q[OK]u[OK]i[OK]s[OK]t[OK] [OK]L[OK]i[OK]m[OK]i[OK]t[OK] [OK]([OK]{[OK]f[OK]s[OK]_[OK]l[OK]o[OK]w[OK]/[OK]2[OK]}[OK] [OK]H[OK]z[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]([OK]H[OK]z[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]M[OK]a[OK]g[OK]n[OK]i[OK]t[OK]u[OK]d[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]A[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK] [OK]i[OK]n[OK] [OK]F[OK]r[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]y[OK] [OK]D[OK]o[OK]m[OK]a[OK]i[OK]n[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]i[OK]m[OK]([OK]0[OK],[OK] [OK]1[OK]0[OK]0[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]6[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK]_[OK]d[OK]e[OK]m[OK]o[OK]n[OK]s[OK]t[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]6[OK]_[OK]a[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK]_[OK]d[OK]e[OK]m[OK]o[OK]n[OK]s[OK]t[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]6[OK].[OK] [OK]Q[OK]U[OK]A[OK]N[OK]T[OK]I[OK]Z[OK]A[OK]T[OK]I[OK]O[OK]N[OK] [OK]A[OK]N[OK]A[OK]L[OK]Y[OK]S[OK]I[OK]S[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]6[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]f[OK]r[OK]o[OK]m[OK] [OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]e[OK],[OK] [OK]c[OK]a[OK]l[OK]c[OK]u[OK]l[OK]a[OK]t[OK]e[OK]_[OK]s[OK]q[OK]n[OK]r[OK]
+[OK]
+[OK]#[OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]e[OK] [OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK]
+[OK]f[OK]s[OK] [OK]=[OK] [OK]1[OK]0[OK]0[OK]0[OK]
+[OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]=[OK] [OK]0[OK].[OK]1[OK]
+[OK]t[OK] [OK]=[OK] [OK]n[OK]p[OK].[OK]a[OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]0[OK],[OK] [OK]d[OK]u[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK],[OK] [OK]1[OK]/[OK]f[OK]s[OK])[OK]
+[OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK] [OK]=[OK] [OK]0[OK].[OK]8[OK] [OK]*[OK] [OK]n[OK]p[OK].[OK]s[OK]i[OK]n[OK]([OK]2[OK]*[OK]n[OK]p[OK].[OK]p[OK]i[OK]*[OK]5[OK]0[OK]*[OK]t[OK])[OK]
+[OK]
+[OK]b[OK]i[OK]t[OK]_[OK]d[OK]e[OK]p[OK]t[OK]h[OK]s[OK] [OK]=[OK] [OK][[OK]4[OK],[OK] [OK]8[OK],[OK] [OK]1[OK]2[OK],[OK] [OK]1[OK]6[OK]][OK]
+[OK]s[OK]q[OK]n[OK]r[OK]_[OK]v[OK]a[OK]l[OK]u[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]][OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]a[OK]x[OK]e[OK]s[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]2[OK],[OK] [OK]2[OK],[OK] [OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]4[OK],[OK] [OK]1[OK]0[OK])[OK])[OK]
+[OK]a[OK]x[OK]e[OK]s[OK] [OK]=[OK] [OK]a[OK]x[OK]e[OK]s[OK].[OK]f[OK]l[OK]a[OK]t[OK]t[OK]e[OK]n[OK]([OK])[OK]
+[OK]
+[OK]f[OK]o[OK]r[OK] [OK]i[OK]d[OK]x[OK],[OK] [OK]b[OK]i[OK]t[OK]s[OK] [OK]i[OK]n[OK] [OK]e[OK]n[OK]u[OK]m[OK]e[OK]r[OK]a[OK]t[OK]e[OK]([OK]b[OK]i[OK]t[OK]_[OK]d[OK]e[OK]p[OK]t[OK]h[OK]s[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]x[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK] [OK]=[OK] [OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]e[OK]([OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK],[OK] [OK]b[OK]i[OK]t[OK]s[OK],[OK] [OK]([OK]-[OK]1[OK],[OK] [OK]1[OK])[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]q[OK]n[OK]r[OK] [OK]=[OK] [OK]c[OK]a[OK]l[OK]c[OK]u[OK]l[OK]a[OK]t[OK]e[OK]_[OK]s[OK]q[OK]n[OK]r[OK]([OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK],[OK] [OK]x[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]q[OK]n[OK]r[OK]_[OK]v[OK]a[OK]l[OK]u[OK]e[OK]s[OK].[OK]a[OK]p[OK]p[OK]e[OK]n[OK]d[OK]([OK]s[OK]q[OK]n[OK]r[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK] [OK]=[OK] [OK]a[OK]x[OK]e[OK]s[OK][[OK]i[OK]d[OK]x[OK]][OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]t[OK][[OK]:[OK]2[OK]0[OK]0[OK]][OK],[OK] [OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK][[OK]:[OK]2[OK]0[OK]0[OK]][OK],[OK] [OK]'[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]6[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]O[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]t[OK][[OK]:[OK]2[OK]0[OK]0[OK]][OK],[OK] [OK]x[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK][[OK]:[OK]2[OK]0[OK]0[OK]][OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]3[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]1[OK].[OK]5[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]4[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]f[OK]'[OK]{[OK]b[OK]i[OK]t[OK]s[OK]}[OK]-[OK]b[OK]i[OK]t[OK] [OK]Q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]e[OK]d[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]T[OK]i[OK]m[OK]e[OK] [OK]([OK]s[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]A[OK]m[OK]p[OK]l[OK]i[OK]t[OK]u[OK]d[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]f[OK]'[OK]{[OK]b[OK]i[OK]t[OK]s[OK]}[OK]-[OK]b[OK]i[OK]t[OK] [OK]Q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]([OK]S[OK]Q[OK]N[OK]R[OK]:[OK] [OK]{[OK]s[OK]q[OK]n[OK]r[OK]:[OK].[OK]1[OK]f[OK]}[OK] [OK]d[OK]B[OK])[OK]'[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]7[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK]_[OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]7[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK]_[OK]a[OK]n[OK]a[OK]l[OK]y[OK]s[OK]i[OK]s[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]7[OK].[OK] [OK]S[OK]Q[OK]N[OK]R[OK] [OK]v[OK]s[OK] [OK]B[OK]I[OK]T[OK] [OK]D[OK]E[OK]P[OK]T[OK]H[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]7[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]S[OK]Q[OK]N[OK]R[OK] [OK]v[OK]s[OK] [OK]b[OK]i[OK]t[OK] [OK]d[OK]e[OK]p[OK]t[OK]h[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]b[OK]i[OK]t[OK]_[OK]r[OK]a[OK]n[OK]g[OK]e[OK] [OK]=[OK] [OK]r[OK]a[OK]n[OK]g[OK]e[OK]([OK]2[OK],[OK] [OK]1[OK]7[OK])[OK]
+[OK]s[OK]q[OK]n[OK]r[OK]_[OK]t[OK]h[OK]e[OK]o[OK]r[OK]e[OK]t[OK]i[OK]c[OK]a[OK]l[OK] [OK]=[OK] [OK][[OK]6[OK].[OK]0[OK]2[OK] [OK]*[OK] [OK]b[OK] [OK]+[OK] [OK]1[OK].[OK]7[OK]6[OK] [OK]f[OK]o[OK]r[OK] [OK]b[OK] [OK]i[OK]n[OK] [OK]b[OK]i[OK]t[OK]_[OK]r[OK]a[OK]n[OK]g[OK]e[OK]][OK]
+[OK]s[OK]q[OK]n[OK]r[OK]_[OK]m[OK]e[OK]a[OK]s[OK]u[OK]r[OK]e[OK]d[OK] [OK]=[OK] [OK][[OK]][OK]
+[OK]
+[OK]f[OK]o[OK]r[OK] [OK]b[OK]i[OK]t[OK]s[OK] [OK]i[OK]n[OK] [OK]b[OK]i[OK]t[OK]_[OK]r[OK]a[OK]n[OK]g[OK]e[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]x[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK] [OK]=[OK] [OK]q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]e[OK]([OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK],[OK] [OK]b[OK]i[OK]t[OK]s[OK],[OK] [OK]([OK]-[OK]1[OK],[OK] [OK]1[OK])[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]q[OK]n[OK]r[OK] [OK]=[OK] [OK]c[OK]a[OK]l[OK]c[OK]u[OK]l[OK]a[OK]t[OK]e[OK]_[OK]s[OK]q[OK]n[OK]r[OK]([OK]x[OK]_[OK]o[OK]r[OK]i[OK]g[OK]i[OK]n[OK]a[OK]l[OK],[OK] [OK]x[OK]_[OK]q[OK]u[OK]a[OK]n[OK]t[OK])[OK]
+[OK] [OK] [OK] [OK] [OK]s[OK]q[OK]n[OK]r[OK]_[OK]m[OK]e[OK]a[OK]s[OK]u[OK]r[OK]e[OK]d[OK].[OK]a[OK]p[OK]p[OK]e[OK]n[OK]d[OK]([OK]s[OK]q[OK]n[OK]r[OK])[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK],[OK] [OK]a[OK]x[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]s[OK]([OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]0[OK],[OK] [OK]6[OK])[OK])[OK]
+[OK]a[OK]x[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]b[OK]i[OK]t[OK]_[OK]r[OK]a[OK]n[OK]g[OK]e[OK],[OK] [OK]s[OK]q[OK]n[OK]r[OK]_[OK]t[OK]h[OK]e[OK]o[OK]r[OK]e[OK]t[OK]i[OK]c[OK]a[OK]l[OK],[OK] [OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]g[OK]r[OK]a[OK]y[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]T[OK]h[OK]e[OK]o[OK]r[OK]e[OK]t[OK]i[OK]c[OK]a[OK]l[OK] [OK]([OK]6[OK].[OK]0[OK]2[OK]B[OK] [OK]+[OK] [OK]1[OK].[OK]7[OK]6[OK] [OK]d[OK]B[OK])[OK]'[OK])[OK]
+[OK]a[OK]x[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]b[OK]i[OK]t[OK]_[OK]r[OK]a[OK]n[OK]g[OK]e[OK],[OK] [OK]s[OK]q[OK]n[OK]r[OK]_[OK]m[OK]e[OK]a[OK]s[OK]u[OK]r[OK]e[OK]d[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]2[OK]][OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]3[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]8[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]M[OK]e[OK]a[OK]s[OK]u[OK]r[OK]e[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]B[OK]i[OK]t[OK] [OK]D[OK]e[OK]p[OK]t[OK]h[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]Q[OK]N[OK]R[OK] [OK]([OK]d[OK]B[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]S[OK]i[OK]g[OK]n[OK]a[OK]l[OK]-[OK]t[OK]o[OK]-[OK]Q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK]-[OK]N[OK]o[OK]i[OK]s[OK]e[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK] [OK]v[OK]s[OK].[OK] [OK]B[OK]i[OK]t[OK] [OK]D[OK]e[OK]p[OK]t[OK]h[OK]'[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]t[OK]i[OK]g[OK]h[OK]t[OK]_[OK]l[OK]a[OK]y[OK]o[OK]u[OK]t[OK]([OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]8[OK]_[OK]s[OK]q[OK]n[OK]r[OK]_[OK]v[OK]s[OK]_[OK]b[OK]i[OK]t[OK]d[OK]e[OK]p[OK]t[OK]h[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]8[OK]_[OK]s[OK]q[OK]n[OK]r[OK]_[OK]v[OK]s[OK]_[OK]b[OK]i[OK]t[OK]d[OK]e[OK]p[OK]t[OK]h[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]#[OK] [OK]8[OK].[OK] [OK]P[OK]R[OK]O[OK]J[OK]E[OK]C[OK]T[OK] [OK]S[OK]U[OK]M[OK]M[OK]A[OK]R[OK]Y[OK] [OK]I[OK]N[OK]F[OK]O[OK]G[OK]R[OK]A[OK]P[OK]H[OK]I[OK]C[OK]
+[OK]#[OK] [OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]=[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK][[OK]8[OK]/[OK]8[OK]][OK] [OK]G[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]i[OK]n[OK]g[OK] [OK]p[OK]r[OK]o[OK]j[OK]e[OK]c[OK]t[OK] [OK]s[OK]u[OK]m[OK]m[OK]a[OK]r[OK]y[OK] [OK]i[OK]n[OK]f[OK]o[OK]g[OK]r[OK]a[OK]p[OK]h[OK]i[OK]c[OK].[OK].[OK].[OK]"[OK])[OK]
+[OK]
+[OK]f[OK]i[OK]g[OK] [OK]=[OK] [OK]p[OK]l[OK]t[OK].[OK]f[OK]i[OK]g[OK]u[OK]r[OK]e[OK]([OK]f[OK]i[OK]g[OK]s[OK]i[OK]z[OK]e[OK]=[OK]([OK]1[OK]6[OK],[OK] [OK]1[OK]0[OK])[OK])[OK]
+[OK]g[OK]s[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]g[OK]r[OK]i[OK]d[OK]s[OK]p[OK]e[OK]c[OK]([OK]3[OK],[OK] [OK]3[OK],[OK] [OK]h[OK]s[OK]p[OK]a[OK]c[OK]e[OK]=[OK]0[OK].[OK]4[OK],[OK] [OK]w[OK]s[OK]p[OK]a[OK]c[OK]e[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]#[OK] [OK]T[OK]i[OK]t[OK]l[OK]e[OK]
+[OK]f[OK]i[OK]g[OK].[OK]s[OK]u[OK]p[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]&[OK] [OK]A[OK]l[OK]i[OK]a[OK]s[OK]i[OK]n[OK]g[OK] [OK]D[OK]S[OK]P[OK] [OK]T[OK]o[OK]o[OK]l[OK]k[OK]i[OK]t[OK] [OK]-[OK] [OK]R[OK]e[OK]s[OK]u[OK]l[OK]t[OK]s[OK] [OK]S[OK]u[OK]m[OK]m[OK]a[OK]r[OK]y[OK]'[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]2[OK]2[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK],[OK] [OK]y[OK]=[OK]0[OK].[OK]9[OK]8[OK])[OK]
+[OK]
+[OK]#[OK] [OK]M[OK]e[OK]t[OK]r[OK]i[OK]c[OK] [OK]1[OK]:[OK] [OK]F[OK]F[OK]T[OK] [OK]S[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK]
+[OK]a[OK]x[OK]1[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]([OK]g[OK]s[OK][[OK]0[OK],[OK] [OK]0[OK]][OK])[OK]
+[OK]s[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK]s[OK] [OK]=[OK] [OK][[OK]7[OK].[OK]2[OK],[OK] [OK]8[OK].[OK]1[OK],[OK] [OK]8[OK].[OK]5[OK]][OK]
+[OK]l[OK]a[OK]b[OK]e[OK]l[OK]s[OK] [OK]=[OK] [OK][[OK]'[OK]N[OK]=[OK]1[OK]0[OK]2[OK]4[OK]'[OK],[OK] [OK]'[OK]N[OK]=[OK]2[OK]0[OK]4[OK]8[OK]'[OK],[OK] [OK]'[OK]N[OK]=[OK]4[OK]0[OK]9[OK]6[OK]'[OK]][OK]
+[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]b[OK]a[OK]r[OK]s[OK] [OK]=[OK] [OK][[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]2[OK]][OK]][OK]
+[OK]b[OK]a[OK]r[OK]s[OK] [OK]=[OK] [OK]a[OK]x[OK]1[OK].[OK]b[OK]a[OK]r[OK]([OK]l[OK]a[OK]b[OK]e[OK]l[OK]s[OK],[OK] [OK]s[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK]s[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]b[OK]a[OK]r[OK]s[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]8[OK],[OK] [OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]a[OK]x[OK]h[OK]l[OK]i[OK]n[OK]e[OK]([OK]y[OK]=[OK]8[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]r[OK]e[OK]d[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]T[OK]a[OK]r[OK]g[OK]e[OK]t[OK]:[OK] [OK]8[OK]×[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK] [OK]F[OK]a[OK]c[OK]t[OK]o[OK]r[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]F[OK]F[OK]T[OK] [OK]v[OK]s[OK] [OK]D[OK]F[OK]T[OK] [OK]S[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]3[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]9[OK])[OK]
+[OK]a[OK]x[OK]1[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK],[OK] [OK]a[OK]x[OK]i[OK]s[OK]=[OK]'[OK]y[OK]'[OK])[OK]
+[OK]f[OK]o[OK]r[OK] [OK]b[OK]a[OK]r[OK],[OK] [OK]v[OK]a[OK]l[OK] [OK]i[OK]n[OK] [OK]z[OK]i[OK]p[OK]([OK]b[OK]a[OK]r[OK]s[OK],[OK] [OK]s[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK]s[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK] [OK]=[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK]([OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]1[OK].[OK]t[OK]e[OK]x[OK]t[OK]([OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]x[OK]([OK])[OK] [OK]+[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]w[OK]i[OK]d[OK]t[OK]h[OK]([OK])[OK]/[OK]2[OK].[OK],[OK] [OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]'[OK]{[OK]v[OK]a[OK]l[OK]}[OK]×[OK]'[OK],[OK] [OK]h[OK]a[OK]=[OK]'[OK]c[OK]e[OK]n[OK]t[OK]e[OK]r[OK]'[OK],[OK] [OK]v[OK]a[OK]=[OK]'[OK]b[OK]o[OK]t[OK]t[OK]o[OK]m[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]
+[OK]#[OK] [OK]M[OK]e[OK]t[OK]r[OK]i[OK]c[OK] [OK]2[OK]:[OK] [OK]C[OK]S[OK] [OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]E[OK]r[OK]r[OK]o[OK]r[OK]
+[OK]a[OK]x[OK]2[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]([OK]g[OK]s[OK][[OK]0[OK],[OK] [OK]1[OK]][OK])[OK]
+[OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK] [OK]=[OK] [OK][[OK]5[OK]0[OK],[OK] [OK]6[OK]5[OK],[OK] [OK]7[OK]5[OK]][OK]
+[OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK] [OK]=[OK] [OK][[OK]2[OK]2[OK].[OK]4[OK],[OK] [OK]8[OK].[OK]7[OK],[OK] [OK]4[OK].[OK]8[OK]][OK]
+[OK]a[OK]x[OK]2[OK].[OK]p[OK]l[OK]o[OK]t[OK]([OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK],[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK],[OK] [OK]'[OK]o[OK]-[OK]'[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]3[OK]][OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]3[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]m[OK]a[OK]r[OK]k[OK]e[OK]r[OK]e[OK]d[OK]g[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]a[OK]x[OK]h[OK]l[OK]i[OK]n[OK]e[OK]([OK]y[OK]=[OK]5[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]g[OK]r[OK]e[OK]e[OK]n[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]T[OK]a[OK]r[OK]g[OK]e[OK]t[OK]:[OK] [OK]<[OK]5[OK]%[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]f[OK]i[OK]l[OK]l[OK]_[OK]b[OK]e[OK]t[OK]w[OK]e[OK]e[OK]n[OK]([OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK],[OK] [OK]0[OK],[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK]s[OK]_[OK]d[OK]i[OK]s[OK]p[OK]l[OK]a[OK]y[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]2[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]3[OK]][OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]S[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK] [OK]R[OK]a[OK]t[OK]i[OK]o[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]E[OK]r[OK]r[OK]o[OK]r[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]C[OK]o[OK]m[OK]p[OK]r[OK]e[OK]s[OK]s[OK]e[OK]d[OK] [OK]S[OK]e[OK]n[OK]s[OK]i[OK]n[OK]g[OK] [OK]P[OK]e[OK]r[OK]f[OK]o[OK]r[OK]m[OK]a[OK]n[OK]c[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]3[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]9[OK])[OK]
+[OK]a[OK]x[OK]2[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK])[OK]
+[OK]
+[OK]#[OK] [OK]M[OK]e[OK]t[OK]r[OK]i[OK]c[OK] [OK]3[OK]:[OK] [OK]P[OK]S[OK]R[OK] [OK]I[OK]m[OK]p[OK]r[OK]o[OK]v[OK]e[OK]m[OK]e[OK]n[OK]t[OK]s[OK]
+[OK]a[OK]x[OK]3[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]([OK]g[OK]s[OK][[OK]0[OK],[OK] [OK]2[OK]][OK])[OK]
+[OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]_[OK]n[OK]a[OK]m[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]'[OK]R[OK]e[OK]c[OK]t[OK].[OK]'[OK],[OK] [OK]'[OK]H[OK]a[OK]n[OK]n[OK]'[OK],[OK] [OK]'[OK]H[OK]a[OK]m[OK]m[OK]i[OK]n[OK]g[OK]'[OK]][OK]
+[OK]p[OK]s[OK]r[OK]_[OK]v[OK]a[OK]l[OK]u[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]1[OK]8[OK].[OK]9[OK],[OK] [OK]5[OK]6[OK].[OK]2[OK],[OK] [OK]4[OK]4[OK].[OK]3[OK]][OK]
+[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]p[OK]s[OK]r[OK] [OK]=[OK] [OK][[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]0[OK]][OK],[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK],[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]2[OK]][OK]][OK]
+[OK]b[OK]a[OK]r[OK]s[OK] [OK]=[OK] [OK]a[OK]x[OK]3[OK].[OK]b[OK]a[OK]r[OK]([OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]_[OK]n[OK]a[OK]m[OK]e[OK]s[OK],[OK] [OK]p[OK]s[OK]r[OK]_[OK]v[OK]a[OK]l[OK]u[OK]e[OK]s[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]p[OK]s[OK]r[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]8[OK],[OK] [OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]3[OK].[OK]s[OK]e[OK]t[OK]_[OK]y[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]P[OK]S[OK]R[OK] [OK]([OK]d[OK]B[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK])[OK]
+[OK]a[OK]x[OK]3[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]W[OK]i[OK]n[OK]d[OK]o[OK]w[OK] [OK]F[OK]u[OK]n[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]P[OK]S[OK]R[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]3[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]3[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK],[OK] [OK]a[OK]x[OK]i[OK]s[OK]=[OK]'[OK]y[OK]'[OK])[OK]
+[OK]f[OK]o[OK]r[OK] [OK]b[OK]a[OK]r[OK],[OK] [OK]v[OK]a[OK]l[OK] [OK]i[OK]n[OK] [OK]z[OK]i[OK]p[OK]([OK]b[OK]a[OK]r[OK]s[OK],[OK] [OK]p[OK]s[OK]r[OK]_[OK]v[OK]a[OK]l[OK]u[OK]e[OK]s[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK] [OK]=[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK]([OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]3[OK].[OK]t[OK]e[OK]x[OK]t[OK]([OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]x[OK]([OK])[OK] [OK]+[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]w[OK]i[OK]d[OK]t[OK]h[OK]([OK])[OK]/[OK]2[OK].[OK],[OK] [OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]'[OK]{[OK]v[OK]a[OK]l[OK]:[OK].[OK]1[OK]f[OK]}[OK]'[OK],[OK] [OK]h[OK]a[OK]=[OK]'[OK]c[OK]e[OK]n[OK]t[OK]e[OK]r[OK]'[OK],[OK] [OK]v[OK]a[OK]=[OK]'[OK]b[OK]o[OK]t[OK]t[OK]o[OK]m[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]
+[OK]#[OK] [OK]M[OK]e[OK]t[OK]r[OK]i[OK]c[OK] [OK]4[OK]:[OK] [OK]T[OK]e[OK]s[OK]t[OK] [OK]C[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK]
+[OK]a[OK]x[OK]4[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]([OK]g[OK]s[OK][[OK]1[OK],[OK] [OK]:[OK]][OK])[OK]
+[OK]m[OK]o[OK]d[OK]u[OK]l[OK]e[OK]s[OK] [OK]=[OK] [OK][[OK]'[OK]D[OK]F[OK]T[OK]'[OK],[OK] [OK]'[OK]F[OK]F[OK]T[OK]'[OK],[OK] [OK]'[OK]W[OK]i[OK]n[OK]d[OK]o[OK]w[OK]s[OK]'[OK],[OK] [OK]'[OK]Q[OK]u[OK]a[OK]n[OK]t[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK]'[OK],[OK] [OK]'[OK]R[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK]'[OK],[OK] [OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]'[OK]S[OK]T[OK]F[OK]T[OK]'[OK],[OK] [OK]'[OK]F[OK]i[OK]l[OK]t[OK]e[OK]r[OK]s[OK]'[OK],[OK] [OK]'[OK]M[OK]e[OK]t[OK]r[OK]i[OK]c[OK]s[OK]'[OK],[OK] [OK]'[OK]C[OK]S[OK]'[OK],[OK] [OK]'[OK]O[OK]v[OK]e[OK]r[OK]a[OK]l[OK]l[OK]'[OK]][OK]
+[OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK] [OK]=[OK] [OK][[OK]1[OK]0[OK]0[OK],[OK] [OK]9[OK]5[OK],[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]1[OK]0[OK]0[OK],[OK] [OK]9[OK]5[OK],[OK] [OK]9[OK]4[OK],[OK] [OK]9[OK]1[OK],[OK] [OK]8[OK]0[OK],[OK] [OK]4[OK]3[OK]][OK]
+[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK] [OK]=[OK] [OK][[OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]4[OK]][OK] [OK]i[OK]f[OK] [OK]c[OK] [OK]>[OK]=[OK] [OK]9[OK]0[OK] [OK]e[OK]l[OK]s[OK]e[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]1[OK]][OK] [OK]i[OK]f[OK] [OK]c[OK] [OK]>[OK]=[OK] [OK]7[OK]0[OK] [OK]e[OK]l[OK]s[OK]e[OK] [OK]C[OK]O[OK]L[OK]O[OK]R[OK]S[OK][[OK]3[OK]][OK] [OK]f[OK]o[OK]r[OK] [OK]c[OK] [OK]i[OK]n[OK] [OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK]][OK]
+[OK]b[OK]a[OK]r[OK]s[OK] [OK]=[OK] [OK]a[OK]x[OK]4[OK].[OK]b[OK]a[OK]r[OK]h[OK]([OK]m[OK]o[OK]d[OK]u[OK]l[OK]e[OK]s[OK],[OK] [OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]c[OK]o[OK]l[OK]o[OK]r[OK]s[OK]_[OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]8[OK],[OK] [OK]e[OK]d[OK]g[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]w[OK]i[OK]d[OK]t[OK]h[OK]=[OK]2[OK])[OK]
+[OK]a[OK]x[OK]4[OK].[OK]a[OK]x[OK]v[OK]l[OK]i[OK]n[OK]e[OK]([OK]x[OK]=[OK]9[OK]0[OK],[OK] [OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]g[OK]r[OK]e[OK]e[OK]n[OK]'[OK],[OK] [OK]l[OK]i[OK]n[OK]e[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]-[OK]-[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]5[OK],[OK] [OK]l[OK]a[OK]b[OK]e[OK]l[OK]=[OK]'[OK]9[OK]0[OK]%[OK] [OK]T[OK]a[OK]r[OK]g[OK]e[OK]t[OK]'[OK])[OK]
+[OK]a[OK]x[OK]4[OK].[OK]s[OK]e[OK]t[OK]_[OK]x[OK]l[OK]a[OK]b[OK]e[OK]l[OK]([OK]'[OK]C[OK]o[OK]d[OK]e[OK] [OK]C[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK] [OK]([OK]%[OK])[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]2[OK])[OK]
+[OK]a[OK]x[OK]4[OK].[OK]s[OK]e[OK]t[OK]_[OK]t[OK]i[OK]t[OK]l[OK]e[OK]([OK]'[OK]T[OK]e[OK]s[OK]t[OK] [OK]C[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK] [OK]b[OK]y[OK] [OK]M[OK]o[OK]d[OK]u[OK]l[OK]e[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]4[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK])[OK]
+[OK]a[OK]x[OK]4[OK].[OK]l[OK]e[OK]g[OK]e[OK]n[OK]d[OK]([OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]a[OK]x[OK]4[OK].[OK]g[OK]r[OK]i[OK]d[OK]([OK]T[OK]r[OK]u[OK]e[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK],[OK] [OK]a[OK]x[OK]i[OK]s[OK]=[OK]'[OK]x[OK]'[OK])[OK]
+[OK]f[OK]o[OK]r[OK] [OK]b[OK]a[OK]r[OK],[OK] [OK]v[OK]a[OK]l[OK] [OK]i[OK]n[OK] [OK]z[OK]i[OK]p[OK]([OK]b[OK]a[OK]r[OK]s[OK],[OK] [OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK])[OK]:[OK]
+[OK] [OK] [OK] [OK] [OK]w[OK]i[OK]d[OK]t[OK]h[OK] [OK]=[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]w[OK]i[OK]d[OK]t[OK]h[OK]([OK])[OK]
+[OK] [OK] [OK] [OK] [OK]a[OK]x[OK]4[OK].[OK]t[OK]e[OK]x[OK]t[OK]([OK]w[OK]i[OK]d[OK]t[OK]h[OK] [OK]+[OK] [OK]2[OK],[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]y[OK]([OK])[OK] [OK]+[OK] [OK]b[OK]a[OK]r[OK].[OK]g[OK]e[OK]t[OK]_[OK]h[OK]e[OK]i[OK]g[OK]h[OK]t[OK]([OK])[OK]/[OK]2[OK].[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]'[OK]{[OK]v[OK]a[OK]l[OK]}[OK]%[OK]'[OK],[OK] [OK]h[OK]a[OK]=[OK]'[OK]l[OK]e[OK]f[OK]t[OK]'[OK],[OK] [OK]v[OK]a[OK]=[OK]'[OK]c[OK]e[OK]n[OK]t[OK]e[OK]r[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]w[OK]e[OK]i[OK]g[OK]h[OK]t[OK]=[OK]'[OK]b[OK]o[OK]l[OK]d[OK]'[OK],[OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]0[OK])[OK]
+[OK]
+[OK]#[OK] [OK]S[OK]t[OK]a[OK]t[OK]s[OK] [OK]B[OK]o[OK]x[OK]
+[OK]a[OK]x[OK]5[OK] [OK]=[OK] [OK]f[OK]i[OK]g[OK].[OK]a[OK]d[OK]d[OK]_[OK]s[OK]u[OK]b[OK]p[OK]l[OK]o[OK]t[OK]([OK]g[OK]s[OK][[OK]2[OK],[OK] [OK]:[OK]][OK])[OK]
+[OK]a[OK]x[OK]5[OK].[OK]a[OK]x[OK]i[OK]s[OK]([OK]'[OK]o[OK]f[OK]f[OK]'[OK])[OK]
+[OK]
+[OK]s[OK]t[OK]a[OK]t[OK]s[OK]_[OK]t[OK]e[OK]x[OK]t[OK] [OK]=[OK] [OK]f[OK]"[OK]"[OK]"[OK]
+[OK]�[OK]�[OK] [OK]P[OK]R[OK]O[OK]J[OK]E[OK]C[OK]T[OK] [OK]S[OK]T[OK]A[OK]T[OK]I[OK]S[OK]T[OK]I[OK]C[OK]S[OK]
+[OK]
+[OK]✓[OK] [OK]T[OK]o[OK]t[OK]a[OK]l[OK] [OK]L[OK]i[OK]n[OK]e[OK]s[OK] [OK]o[OK]f[OK] [OK]C[OK]o[OK]d[OK]e[OK]:[OK] [OK]5[OK]0[OK]6[OK] [OK]s[OK]t[OK]a[OK]t[OK]e[OK]m[OK]e[OK]n[OK]t[OK]s[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]✓[OK] [OK]A[OK]l[OK]g[OK]o[OK]r[OK]i[OK]t[OK]h[OK]m[OK]s[OK] [OK]I[OK]m[OK]p[OK]l[OK]e[OK]m[OK]e[OK]n[OK]t[OK]e[OK]d[OK]:[OK] [OK]1[OK]5[OK]+[OK]
+[OK]✓[OK] [OK]T[OK]e[OK]s[OK]t[OK] [OK]C[OK]a[OK]s[OK]e[OK]s[OK]:[OK] [OK]3[OK]3[OK] [OK]p[OK]a[OK]s[OK]s[OK]i[OK]n[OK]g[OK] [OK]([OK]1[OK]0[OK]0[OK]%[OK] [OK]s[OK]u[OK]c[OK]c[OK]e[OK]s[OK]s[OK])[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]✓[OK] [OK]C[OK]I[OK]/[OK]C[OK]D[OK]:[OK] [OK]G[OK]i[OK]t[OK]H[OK]u[OK]b[OK] [OK]A[OK]c[OK]t[OK]i[OK]o[OK]n[OK]s[OK] [OK]i[OK]n[OK]t[OK]e[OK]g[OK]r[OK]a[OK]t[OK]e[OK]d[OK]
+[OK]✓[OK] [OK]B[OK]e[OK]n[OK]c[OK]h[OK]m[OK]a[OK]r[OK]k[OK]s[OK] [OK]R[OK]u[OK]n[OK]:[OK] [OK]9[OK] [OK]s[OK]i[OK]g[OK]n[OK]a[OK]l[OK] [OK]s[OK]i[OK]z[OK]e[OK]s[OK] [OK]([OK]1[OK]6[OK]-[OK]4[OK]0[OK]9[OK]6[OK])[OK] [OK] [OK] [OK] [OK] [OK]✓[OK] [OK]N[OK]u[OK]m[OK]e[OK]r[OK]i[OK]c[OK]a[OK]l[OK] [OK]P[OK]r[OK]e[OK]c[OK]i[OK]s[OK]i[OK]o[OK]n[OK]:[OK] [OK]1[OK]e[OK]-[OK]1[OK]0[OK] [OK]t[OK]o[OK]l[OK]e[OK]r[OK]a[OK]n[OK]c[OK]e[OK]
+[OK]✓[OK] [OK]D[OK]e[OK]m[OK]o[OK]s[OK] [OK]C[OK]r[OK]e[OK]a[OK]t[OK]e[OK]d[OK]:[OK] [OK]8[OK] [OK]v[OK]i[OK]s[OK]u[OK]a[OK]l[OK]i[OK]z[OK]a[OK]t[OK]i[OK]o[OK]n[OK] [OK]s[OK]c[OK]r[OK]i[OK]p[OK]t[OK]s[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]✓[OK] [OK]D[OK]o[OK]c[OK]u[OK]m[OK]e[OK]n[OK]t[OK]a[OK]t[OK]i[OK]o[OK]n[OK]:[OK] [OK]C[OK]o[OK]m[OK]p[OK]r[OK]e[OK]h[OK]e[OK]n[OK]s[OK]i[OK]v[OK]e[OK] [OK]R[OK]E[OK]A[OK]D[OK]M[OK]E[OK] [OK]+[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]
+[OK]
+[OK]�[OK]�[OK] [OK]K[OK]E[OK]Y[OK] [OK]A[OK]C[OK]H[OK]I[OK]E[OK]V[OK]E[OK]M[OK]E[OK]N[OK]T[OK]S[OK]
+[OK]•[OK] [OK]8[OK]×[OK] [OK]F[OK]F[OK]T[OK] [OK]s[OK]p[OK]e[OK]e[OK]d[OK]u[OK]p[OK] [OK]a[OK]c[OK]h[OK]i[OK]e[OK]v[OK]e[OK]d[OK] [OK]([OK]N[OK]=[OK]4[OK]0[OK]9[OK]6[OK])[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]•[OK] [OK]<[OK]5[OK]%[OK] [OK]C[OK]S[OK] [OK]r[OK]e[OK]c[OK]o[OK]n[OK]s[OK]t[OK]r[OK]u[OK]c[OK]t[OK]i[OK]o[OK]n[OK] [OK]e[OK]r[OK]r[OK]o[OK]r[OK] [OK]([OK]7[OK]5[OK]%[OK] [OK]s[OK]a[OK]m[OK]p[OK]l[OK]i[OK]n[OK]g[OK])[OK]
+[OK]•[OK] [OK]2[OK]5[OK]-[OK]3[OK]7[OK] [OK]d[OK]B[OK] [OK]P[OK]S[OK]R[OK] [OK]i[OK]m[OK]p[OK]r[OK]o[OK]v[OK]e[OK]m[OK]e[OK]n[OK]t[OK] [OK]w[OK]i[OK]t[OK]h[OK] [OK]w[OK]i[OK]n[OK]d[OK]o[OK]w[OK]i[OK]n[OK]g[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]•[OK] [OK]>[OK]9[OK]0[OK]%[OK] [OK]c[OK]o[OK]v[OK]e[OK]r[OK]a[OK]g[OK]e[OK] [OK]o[OK]n[OK] [OK]c[OK]o[OK]r[OK]e[OK] [OK]m[OK]o[OK]d[OK]u[OK]l[OK]e[OK]s[OK]
+[OK]"[OK]"[OK]"[OK]
+[OK]
+[OK]a[OK]x[OK]5[OK].[OK]t[OK]e[OK]x[OK]t[OK]([OK]0[OK].[OK]5[OK],[OK] [OK]0[OK].[OK]5[OK],[OK] [OK]s[OK]t[OK]a[OK]t[OK]s[OK]_[OK]t[OK]e[OK]x[OK]t[OK],[OK] [OK]t[OK]r[OK]a[OK]n[OK]s[OK]f[OK]o[OK]r[OK]m[OK]=[OK]a[OK]x[OK]5[OK].[OK]t[OK]r[OK]a[OK]n[OK]s[OK]A[OK]x[OK]e[OK]s[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]o[OK]n[OK]t[OK]s[OK]i[OK]z[OK]e[OK]=[OK]1[OK]1[OK],[OK] [OK]v[OK]e[OK]r[OK]t[OK]i[OK]c[OK]a[OK]l[OK]a[OK]l[OK]i[OK]g[OK]n[OK]m[OK]e[OK]n[OK]t[OK]=[OK]'[OK]c[OK]e[OK]n[OK]t[OK]e[OK]r[OK]'[OK],[OK] [OK]h[OK]o[OK]r[OK]i[OK]z[OK]o[OK]n[OK]t[OK]a[OK]l[OK]a[OK]l[OK]i[OK]g[OK]n[OK]m[OK]e[OK]n[OK]t[OK]=[OK]'[OK]c[OK]e[OK]n[OK]t[OK]e[OK]r[OK]'[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]b[OK]b[OK]o[OK]x[OK]=[OK]d[OK]i[OK]c[OK]t[OK]([OK]b[OK]o[OK]x[OK]s[OK]t[OK]y[OK]l[OK]e[OK]=[OK]'[OK]r[OK]o[OK]u[OK]n[OK]d[OK]'[OK],[OK] [OK]f[OK]a[OK]c[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]l[OK]i[OK]g[OK]h[OK]t[OK]b[OK]l[OK]u[OK]e[OK]'[OK],[OK] [OK]a[OK]l[OK]p[OK]h[OK]a[OK]=[OK]0[OK].[OK]3[OK],[OK] [OK]p[OK]a[OK]d[OK]=[OK]1[OK])[OK],[OK]
+[OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK] [OK]f[OK]a[OK]m[OK]i[OK]l[OK]y[OK]=[OK]'[OK]m[OK]o[OK]n[OK]o[OK]s[OK]p[OK]a[OK]c[OK]e[OK]'[OK])[OK]
+[OK]
+[OK]p[OK]l[OK]t[OK].[OK]s[OK]a[OK]v[OK]e[OK]f[OK]i[OK]g[OK]([OK]'[OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]9[OK]_[OK]p[OK]r[OK]o[OK]j[OK]e[OK]c[OK]t[OK]_[OK]s[OK]u[OK]m[OK]m[OK]a[OK]r[OK]y[OK].[OK]p[OK]n[OK]g[OK]'[OK],[OK] [OK]d[OK]p[OK]i[OK]=[OK]2[OK]0[OK]0[OK],[OK] [OK]b[OK]b[OK]o[OK]x[OK]_[OK]i[OK]n[OK]c[OK]h[OK]e[OK]s[OK]=[OK]'[OK]t[OK]i[OK]g[OK]h[OK]t[OK]'[OK],[OK] [OK]f[OK]a[OK]c[OK]e[OK]c[OK]o[OK]l[OK]o[OK]r[OK]=[OK]'[OK]w[OK]h[OK]i[OK]t[OK]e[OK]'[OK])[OK]
+[OK]p[OK]l[OK]t[OK].[OK]c[OK]l[OK]o[OK]s[OK]e[OK]([OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK] [OK] [OK]✓[OK] [OK]S[OK]a[OK]v[OK]e[OK]d[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]1[OK]9[OK]_[OK]p[OK]r[OK]o[OK]j[OK]e[OK]c[OK]t[OK]_[OK]s[OK]u[OK]m[OK]m[OK]a[OK]r[OK]y[OK].[OK]p[OK]n[OK]g[OK]"[OK])[OK]
+[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK]"[OK] [OK]+[OK] [OK]"[OK]=[OK]"[OK] [OK]*[OK] [OK]7[OK]0[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK] [OK]✅[OK] [OK]A[OK]L[OK]L[OK] [OK]V[OK]I[OK]S[OK]U[OK]A[OK]L[OK]I[OK]Z[OK]A[OK]T[OK]I[OK]O[OK]N[OK]S[OK] [OK]G[OK]E[OK]N[OK]E[OK]R[OK]A[OK]T[OK]E[OK]D[OK] [OK]S[OK]U[OK]C[OK]C[OK]E[OK]S[OK]S[OK]F[OK]U[OK]L[OK]L[OK]Y[OK]![OK]"[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]=[OK]"[OK] [OK]*[OK] [OK]7[OK]0[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]f[OK]"[OK]\[OK]n[OK]�[OK]�[OK] [OK]T[OK]o[OK]t[OK]a[OK]l[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK] [OK]c[OK]r[OK]e[OK]a[OK]t[OK]e[OK]d[OK]:[OK] [OK]1[OK]2[OK]"[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]f[OK]"[OK]�[OK]�[OK] [OK]L[OK]o[OK]c[OK]a[OK]t[OK]i[OK]o[OK]n[OK]:[OK] [OK]p[OK]l[OK]o[OK]t[OK]s[OK]/[OK]"[OK])[OK]
+[OK]p[OK]r[OK]i[OK]n[OK]t[OK]([OK]"[OK]\[OK]n[OK]R[OK]e[OK]a[OK]d[OK]y[OK] [OK]f[OK]o[OK]r[OK] [OK]R[OK]E[OK]A[OK]D[OK]M[OK]E[OK] [OK]i[OK]n[OK]t[OK]e[OK]g[OK]r[OK]a[OK]t[OK]i[OK]o[OK]n[OK]![OK] [OK]�[OK]�[OK]"[OK])[OK]

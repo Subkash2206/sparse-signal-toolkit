@@ -1,87 +1,87 @@
-# benchmarks.py
-
-import numpy as np
-import time
-import matplotlib.pyplot as plt
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-from dft import dft
-from fft import fft, fft_iterative
-
-def benchmark(func, x, repeats=3):
-    """Run function multiple times and return average execution time."""
-    times = []
-    for _ in range(repeats):
-        start = time.perf_counter()
-        func(x)
-        end = time.perf_counter()
-        times.append(end - start)
-    return np.mean(times)
-
-def run_benchmarks():
-    print("Running FFT Benchmarks...")
-    print("=" * 50)
-    
-    # Test sizes (powers of 2)
-    sizes = [2**n for n in range(4, 13)]  # 16 to 4096
-    
-    dft_times = []
-    fft_rec_times = []
-    fft_iter_times = []
-    numpy_times = []
-    
-    for N in sizes:
-        print(f"N = {N:5d} ... ", end="", flush=True)
-        
-        # Generate random signal
-        np.random.seed(42)
-        x = np.random.randn(N) + 1j * np.random.randn(N)
-        
-        # Only run DFT for small sizes (it's too slow otherwise)
-        if N <= 512:
-            t_dft = benchmark(dft, x)
-            dft_times.append(t_dft)
-        else:
-            dft_times.append(np.nan)
-        
-        # FFT (recursive)
-        t_fft_rec = benchmark(fft, x)
-        fft_rec_times.append(t_fft_rec)
-        
-        # FFT (iterative)
-        t_fft_iter = benchmark(fft_iterative, x)
-        fft_iter_times.append(t_fft_iter)
-        
-        # NumPy FFT
-        t_numpy = benchmark(np.fft.fft, x)
-        numpy_times.append(t_numpy)
-        
-        print(f"DFT: {dft_times[-1] if not np.isnan(dft_times[-1]) else 'SKIP':>10} | "
-              f"FFT(rec): {t_fft_rec:.6f}s | "
-              f"FFT(iter): {t_fft_iter:.6f}s | "
-              f"NumPy: {t_numpy:.6f}s")
-    
-    # Plotting
-    os.makedirs("plots", exist_ok=True)
-    
-    plt.figure(figsize=(10, 6))
-    
-    plt.loglog(sizes, dft_times, 'r-o', label="O(N²) DFT", markersize=8)
-    plt.loglog(sizes, fft_rec_times, 'b-s', label="O(N log N) FFT (Recursive)", markersize=6)
-    plt.loglog(sizes, fft_iter_times, 'g-^', label="O(N log N) FFT (Iterative)", markersize=6)
-    plt.loglog(sizes, numpy_times, 'k--d', label="NumPy FFT (Optimized C)", markersize=6)
-    
-    plt.xlabel("Signal Length (N)")
-    plt.ylabel("Execution Time (seconds)")
-    plt.title("FFT Benchmark: Complexity Comparison")
-    plt.legend()
-    plt.grid(True, which="both", ls="--", alpha=0.5)
-    
-    plt.savefig("plots/09_fft_benchmark.png", dpi=150)
-    print("\nBenchmark plot saved to plots/09_fft_benchmark.png")
-
-if __name__ == "__main__":
-    run_benchmarks()
+﻿^2#^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2s^2.^2p^2y^2
+^2
+^2i^2m^2p^2o^2r^2t^2 ^2n^2u^2m^2p^2y^2 ^2a^2s^2 ^2n^2p^2
+^2i^2m^2p^2o^2r^2t^2 ^2t^2i^2m^2e^2
+^2i^2m^2p^2o^2r^2t^2 ^2m^2a^2t^2p^2l^2o^2t^2l^2i^2b^2.^2p^2y^2p^2l^2o^2t^2 ^2a^2s^2 ^2p^2l^2t^2
+^2i^2m^2p^2o^2r^2t^2 ^2s^2y^2s^2
+^2i^2m^2p^2o^2r^2t^2 ^2o^2s^2
+^2
+^2s^2y^2s^2.^2p^2a^2t^2h^2.^2i^2n^2s^2e^2r^2t^2(^20^2,^2 ^2o^2s^2.^2p^2a^2t^2h^2.^2j^2o^2i^2n^2(^2o^2s^2.^2p^2a^2t^2h^2.^2d^2i^2r^2n^2a^2m^2e^2(^2_^2_^2f^2i^2l^2e^2_^2_^2)^2,^2 ^2'^2s^2r^2c^2'^2)^2)^2
+^2
+^2f^2r^2o^2m^2 ^2d^2f^2t^2 ^2i^2m^2p^2o^2r^2t^2 ^2d^2f^2t^2
+^2f^2r^2o^2m^2 ^2f^2f^2t^2 ^2i^2m^2p^2o^2r^2t^2 ^2f^2f^2t^2,^2 ^2f^2f^2t^2_^2i^2t^2e^2r^2a^2t^2i^2v^2e^2
+^2
+^2d^2e^2f^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2(^2f^2u^2n^2c^2,^2 ^2x^2,^2 ^2r^2e^2p^2e^2a^2t^2s^2=^23^2)^2:^2
+^2 ^2 ^2 ^2 ^2"^2"^2"^2R^2u^2n^2 ^2f^2u^2n^2c^2t^2i^2o^2n^2 ^2m^2u^2l^2t^2i^2p^2l^2e^2 ^2t^2i^2m^2e^2s^2 ^2a^2n^2d^2 ^2r^2e^2t^2u^2r^2n^2 ^2a^2v^2e^2r^2a^2g^2e^2 ^2e^2x^2e^2c^2u^2t^2i^2o^2n^2 ^2t^2i^2m^2e^2.^2"^2"^2"^2
+^2 ^2 ^2 ^2 ^2t^2i^2m^2e^2s^2 ^2=^2 ^2[^2]^2
+^2 ^2 ^2 ^2 ^2f^2o^2r^2 ^2_^2 ^2i^2n^2 ^2r^2a^2n^2g^2e^2(^2r^2e^2p^2e^2a^2t^2s^2)^2:^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2s^2t^2a^2r^2t^2 ^2=^2 ^2t^2i^2m^2e^2.^2p^2e^2r^2f^2_^2c^2o^2u^2n^2t^2e^2r^2(^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2u^2n^2c^2(^2x^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2e^2n^2d^2 ^2=^2 ^2t^2i^2m^2e^2.^2p^2e^2r^2f^2_^2c^2o^2u^2n^2t^2e^2r^2(^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2e^2n^2d^2 ^2-^2 ^2s^2t^2a^2r^2t^2)^2
+^2 ^2 ^2 ^2 ^2r^2e^2t^2u^2r^2n^2 ^2n^2p^2.^2m^2e^2a^2n^2(^2t^2i^2m^2e^2s^2)^2
+^2
+^2d^2e^2f^2 ^2r^2u^2n^2_^2b^2e^2n^2c^2h^2m^2a^2r^2k^2s^2(^2)^2:^2
+^2 ^2 ^2 ^2 ^2p^2r^2i^2n^2t^2(^2"^2R^2u^2n^2n^2i^2n^2g^2 ^2F^2F^2T^2 ^2B^2e^2n^2c^2h^2m^2a^2r^2k^2s^2.^2.^2.^2"^2)^2
+^2 ^2 ^2 ^2 ^2p^2r^2i^2n^2t^2(^2"^2=^2"^2 ^2*^2 ^25^20^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2#^2 ^2T^2e^2s^2t^2 ^2s^2i^2z^2e^2s^2 ^2(^2p^2o^2w^2e^2r^2s^2 ^2o^2f^2 ^22^2)^2
+^2 ^2 ^2 ^2 ^2s^2i^2z^2e^2s^2 ^2=^2 ^2[^22^2*^2*^2n^2 ^2f^2o^2r^2 ^2n^2 ^2i^2n^2 ^2r^2a^2n^2g^2e^2(^24^2,^2 ^21^23^2)^2]^2 ^2 ^2#^2 ^21^26^2 ^2t^2o^2 ^24^20^29^26^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2d^2f^2t^2_^2t^2i^2m^2e^2s^2 ^2=^2 ^2[^2]^2
+^2 ^2 ^2 ^2 ^2f^2f^2t^2_^2r^2e^2c^2_^2t^2i^2m^2e^2s^2 ^2=^2 ^2[^2]^2
+^2 ^2 ^2 ^2 ^2f^2f^2t^2_^2i^2t^2e^2r^2_^2t^2i^2m^2e^2s^2 ^2=^2 ^2[^2]^2
+^2 ^2 ^2 ^2 ^2n^2u^2m^2p^2y^2_^2t^2i^2m^2e^2s^2 ^2=^2 ^2[^2]^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2f^2o^2r^2 ^2N^2 ^2i^2n^2 ^2s^2i^2z^2e^2s^2:^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2p^2r^2i^2n^2t^2(^2f^2"^2N^2 ^2=^2 ^2{^2N^2:^25^2d^2}^2 ^2.^2.^2.^2 ^2"^2,^2 ^2e^2n^2d^2=^2"^2"^2,^2 ^2f^2l^2u^2s^2h^2=^2T^2r^2u^2e^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2#^2 ^2G^2e^2n^2e^2r^2a^2t^2e^2 ^2r^2a^2n^2d^2o^2m^2 ^2s^2i^2g^2n^2a^2l^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2n^2p^2.^2r^2a^2n^2d^2o^2m^2.^2s^2e^2e^2d^2(^24^22^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2x^2 ^2=^2 ^2n^2p^2.^2r^2a^2n^2d^2o^2m^2.^2r^2a^2n^2d^2n^2(^2N^2)^2 ^2+^2 ^21^2j^2 ^2*^2 ^2n^2p^2.^2r^2a^2n^2d^2o^2m^2.^2r^2a^2n^2d^2n^2(^2N^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2#^2 ^2O^2n^2l^2y^2 ^2r^2u^2n^2 ^2D^2F^2T^2 ^2f^2o^2r^2 ^2s^2m^2a^2l^2l^2 ^2s^2i^2z^2e^2s^2 ^2(^2i^2t^2'^2s^2 ^2t^2o^2o^2 ^2s^2l^2o^2w^2 ^2o^2t^2h^2e^2r^2w^2i^2s^2e^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2i^2f^2 ^2N^2 ^2<^2=^2 ^25^21^22^2:^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2t^2_^2d^2f^2t^2 ^2=^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2(^2d^2f^2t^2,^2 ^2x^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2d^2f^2t^2_^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2t^2_^2d^2f^2t^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2e^2l^2s^2e^2:^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2d^2f^2t^2_^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2n^2p^2.^2n^2a^2n^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2#^2 ^2F^2F^2T^2 ^2(^2r^2e^2c^2u^2r^2s^2i^2v^2e^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2t^2_^2f^2f^2t^2_^2r^2e^2c^2 ^2=^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2(^2f^2f^2t^2,^2 ^2x^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2f^2t^2_^2r^2e^2c^2_^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2t^2_^2f^2f^2t^2_^2r^2e^2c^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2#^2 ^2F^2F^2T^2 ^2(^2i^2t^2e^2r^2a^2t^2i^2v^2e^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2t^2_^2f^2f^2t^2_^2i^2t^2e^2r^2 ^2=^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2(^2f^2f^2t^2_^2i^2t^2e^2r^2a^2t^2i^2v^2e^2,^2 ^2x^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2f^2t^2_^2i^2t^2e^2r^2_^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2t^2_^2f^2f^2t^2_^2i^2t^2e^2r^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2#^2 ^2N^2u^2m^2P^2y^2 ^2F^2F^2T^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2t^2_^2n^2u^2m^2p^2y^2 ^2=^2 ^2b^2e^2n^2c^2h^2m^2a^2r^2k^2(^2n^2p^2.^2f^2f^2t^2.^2f^2f^2t^2,^2 ^2x^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2n^2u^2m^2p^2y^2_^2t^2i^2m^2e^2s^2.^2a^2p^2p^2e^2n^2d^2(^2t^2_^2n^2u^2m^2p^2y^2)^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2p^2r^2i^2n^2t^2(^2f^2"^2D^2F^2T^2:^2 ^2{^2d^2f^2t^2_^2t^2i^2m^2e^2s^2[^2-^21^2]^2 ^2i^2f^2 ^2n^2o^2t^2 ^2n^2p^2.^2i^2s^2n^2a^2n^2(^2d^2f^2t^2_^2t^2i^2m^2e^2s^2[^2-^21^2]^2)^2 ^2e^2l^2s^2e^2 ^2'^2S^2K^2I^2P^2'^2:^2>^21^20^2}^2 ^2|^2 ^2"^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2"^2F^2F^2T^2(^2r^2e^2c^2)^2:^2 ^2{^2t^2_^2f^2f^2t^2_^2r^2e^2c^2:^2.^26^2f^2}^2s^2 ^2|^2 ^2"^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2"^2F^2F^2T^2(^2i^2t^2e^2r^2)^2:^2 ^2{^2t^2_^2f^2f^2t^2_^2i^2t^2e^2r^2:^2.^26^2f^2}^2s^2 ^2|^2 ^2"^2
+^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2 ^2f^2"^2N^2u^2m^2P^2y^2:^2 ^2{^2t^2_^2n^2u^2m^2p^2y^2:^2.^26^2f^2}^2s^2"^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2#^2 ^2P^2l^2o^2t^2t^2i^2n^2g^2
+^2 ^2 ^2 ^2 ^2o^2s^2.^2m^2a^2k^2e^2d^2i^2r^2s^2(^2"^2p^2l^2o^2t^2s^2"^2,^2 ^2e^2x^2i^2s^2t^2_^2o^2k^2=^2T^2r^2u^2e^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2f^2i^2g^2u^2r^2e^2(^2f^2i^2g^2s^2i^2z^2e^2=^2(^21^20^2,^2 ^26^2)^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2l^2o^2g^2l^2o^2g^2(^2s^2i^2z^2e^2s^2,^2 ^2d^2f^2t^2_^2t^2i^2m^2e^2s^2,^2 ^2'^2r^2-^2o^2'^2,^2 ^2l^2a^2b^2e^2l^2=^2"^2O^2(^2N^2²^2)^2 ^2D^2F^2T^2"^2,^2 ^2m^2a^2r^2k^2e^2r^2s^2i^2z^2e^2=^28^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2l^2o^2g^2l^2o^2g^2(^2s^2i^2z^2e^2s^2,^2 ^2f^2f^2t^2_^2r^2e^2c^2_^2t^2i^2m^2e^2s^2,^2 ^2'^2b^2-^2s^2'^2,^2 ^2l^2a^2b^2e^2l^2=^2"^2O^2(^2N^2 ^2l^2o^2g^2 ^2N^2)^2 ^2F^2F^2T^2 ^2(^2R^2e^2c^2u^2r^2s^2i^2v^2e^2)^2"^2,^2 ^2m^2a^2r^2k^2e^2r^2s^2i^2z^2e^2=^26^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2l^2o^2g^2l^2o^2g^2(^2s^2i^2z^2e^2s^2,^2 ^2f^2f^2t^2_^2i^2t^2e^2r^2_^2t^2i^2m^2e^2s^2,^2 ^2'^2g^2-^2^^2'^2,^2 ^2l^2a^2b^2e^2l^2=^2"^2O^2(^2N^2 ^2l^2o^2g^2 ^2N^2)^2 ^2F^2F^2T^2 ^2(^2I^2t^2e^2r^2a^2t^2i^2v^2e^2)^2"^2,^2 ^2m^2a^2r^2k^2e^2r^2s^2i^2z^2e^2=^26^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2l^2o^2g^2l^2o^2g^2(^2s^2i^2z^2e^2s^2,^2 ^2n^2u^2m^2p^2y^2_^2t^2i^2m^2e^2s^2,^2 ^2'^2k^2-^2-^2d^2'^2,^2 ^2l^2a^2b^2e^2l^2=^2"^2N^2u^2m^2P^2y^2 ^2F^2F^2T^2 ^2(^2O^2p^2t^2i^2m^2i^2z^2e^2d^2 ^2C^2)^2"^2,^2 ^2m^2a^2r^2k^2e^2r^2s^2i^2z^2e^2=^26^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2x^2l^2a^2b^2e^2l^2(^2"^2S^2i^2g^2n^2a^2l^2 ^2L^2e^2n^2g^2t^2h^2 ^2(^2N^2)^2"^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2y^2l^2a^2b^2e^2l^2(^2"^2E^2x^2e^2c^2u^2t^2i^2o^2n^2 ^2T^2i^2m^2e^2 ^2(^2s^2e^2c^2o^2n^2d^2s^2)^2"^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2t^2i^2t^2l^2e^2(^2"^2F^2F^2T^2 ^2B^2e^2n^2c^2h^2m^2a^2r^2k^2:^2 ^2C^2o^2m^2p^2l^2e^2x^2i^2t^2y^2 ^2C^2o^2m^2p^2a^2r^2i^2s^2o^2n^2"^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2l^2e^2g^2e^2n^2d^2(^2)^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2g^2r^2i^2d^2(^2T^2r^2u^2e^2,^2 ^2w^2h^2i^2c^2h^2=^2"^2b^2o^2t^2h^2"^2,^2 ^2l^2s^2=^2"^2-^2-^2"^2,^2 ^2a^2l^2p^2h^2a^2=^20^2.^25^2)^2
+^2 ^2 ^2 ^2 ^2
+^2 ^2 ^2 ^2 ^2p^2l^2t^2.^2s^2a^2v^2e^2f^2i^2g^2(^2"^2p^2l^2o^2t^2s^2/^20^29^2_^2f^2f^2t^2_^2b^2e^2n^2c^2h^2m^2a^2r^2k^2.^2p^2n^2g^2"^2,^2 ^2d^2p^2i^2=^21^25^20^2)^2
+^2 ^2 ^2 ^2 ^2p^2r^2i^2n^2t^2(^2"^2\^2n^2B^2e^2n^2c^2h^2m^2a^2r^2k^2 ^2p^2l^2o^2t^2 ^2s^2a^2v^2e^2d^2 ^2t^2o^2 ^2p^2l^2o^2t^2s^2/^20^29^2_^2f^2f^2t^2_^2b^2e^2n^2c^2h^2m^2a^2r^2k^2.^2p^2n^2g^2"^2)^2
+^2
+^2i^2f^2 ^2_^2_^2n^2a^2m^2e^2_^2_^2 ^2=^2=^2 ^2"^2_^2_^2m^2a^2i^2n^2_^2_^2"^2:^2
+^2 ^2 ^2 ^2 ^2r^2u^2n^2_^2b^2e^2n^2c^2h^2m^2a^2r^2k^2s^2(^2)^2

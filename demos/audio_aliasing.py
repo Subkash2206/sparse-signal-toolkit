@@ -42,7 +42,7 @@ def main():
     fs_low = 8000
     
     # Simple decimation (pick every Nth sample)
-    # Ratio ≈ 5.5. We'll just resample using valid indices closest to the timeline
+    # Ratio ~= 5.5. We'll just resample using valid indices closest to the timeline
     step = fs_high / fs_low
     indices = np.arange(0, len(x_high), step).astype(int)
     x_low = x_high[indices]

@@ -22,7 +22,7 @@ def hann(N):
     n = np.arange(N)
 
     # Hann window definition:
-    # w[n] = 0.5 * (1 - cos(2πn / (N - 1)))
+    # w[n] = 0.5 * (1 - cos(2*pi*n / (N - 1)))
     # The smooth cosine taper reduces sidelobes in the frequency domain
     return 0.5 * (1 - np.cos(2 * np.pi * n / (N - 1)))
 
@@ -35,6 +35,6 @@ def hamming(N):
     n = np.arange(N)
 
     # Hamming window definition:
-    # w[n] = 0.54 - 0.46 * cos(2πn / (N - 1))
+    # w[n] = 0.54 - 0.46 * cos(2*pi*n / (N - 1))
     # This window provides better sidelobe attenuation than Hann
     return 0.54 - 0.46 * np.cos(2 * np.pi * n / (N - 1))

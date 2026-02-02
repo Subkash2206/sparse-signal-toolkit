@@ -18,6 +18,3 @@ Thumbs.db
 # Editor files
 .vscode/
 .idea/
-
-# Generated outputs
-plots/
