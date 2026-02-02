@@ -1,5 +1,6 @@
 # Sampling & Aliasing DSP Toolkit
 
+<<<<<<< HEAD
 <div align="center">
 
 ![Hero Banner](plots/00_hero_banner.png)
@@ -30,6 +31,13 @@
 
 ---
 
+=======
+**Build Status:** Passing (GitHub Actions)
+**Language:** Python 3.10+
+**License:** MIT
+**Version:** 1.0.0
+ 
+>>>>>>> 1c298360d39c7865a8beccbed2166f72c5ddfec9
 ## Project Overview
 
 This toolkit provides transparent, ground-up implementations of fundamental digital signal processing algorithms. Unlike standard libraries that obscure implementation details, this project reveals the mathematical principles underlying:
