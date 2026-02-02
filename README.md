@@ -1,6 +1,5 @@
 # Sampling & Aliasing DSP Toolkit
 
-<<<<<<< HEAD
 <div align="center">
 
 ![Hero Banner](plots/00_hero_banner.png)
@@ -21,23 +20,16 @@
 
 | Metric | Target | Achieved | Status |
 |--------|--------|----------|--------|
-| **FFT Speedup (N=4096)** | 8× | 8.1× | ✓ |
-| **Compressed Sensing Error** | <5% | 4.79% | ✓ |
-| **Peak-to-Sidelobe Ratio** | 15-20 dB | 25-37 dB | ✓ |
-| **Test Coverage** | >90% | 90-100% (core) | ✓ |
-| **Numerical Precision** | High | 1e-10 | ✓ |
+| **FFT Speedup (N=4096)** | 8x | 8.1x | PASS |
+| **Compressed Sensing Error** | <5% | 4.79% | PASS |
+| **Peak-to-Sidelobe Ratio** | 15-20 dB | 25-37 dB | PASS |
+| **Test Coverage** | >90% | 90-100% (core) | PASS |
+| **Numerical Precision** | High | 1e-10 | PASS |
 
 ![Project Summary](plots/19_project_summary.png)
 
 ---
 
-=======
-**Build Status:** Passing (GitHub Actions)
-**Language:** Python 3.10+
-**License:** MIT
-**Version:** 1.0.0
- 
->>>>>>> 1c298360d39c7865a8beccbed2166f72c5ddfec9
 ## Project Overview
 
 This toolkit provides transparent, ground-up implementations of fundamental digital signal processing algorithms. Unlike standard libraries that obscure implementation details, this project reveals the mathematical principles underlying:
@@ -94,7 +86,7 @@ python benchmarks.py
 **Performance Summary (N=4096)**:
 - DFT (projected): 0.15-0.20s
 - FFT (iterative): 0.022s  
-- **Measured Speedup: 8.1×**
+- **Measured Speedup: 8.1x**
 
 ---
 
@@ -491,8 +483,8 @@ Through implementation, several deeper questions emerged:
 **Question:** Why do window functions improve PSR but widen main lobe?
 
 **Analysis:**
-- Hann window: +37 dB PSR, 2× main lobe width
-- Hamming window: +25 dB PSR, 1.8× main lobe width  
+- Hann window: +37 dB PSR, 2x main lobe width
+- Hamming window: +25 dB PSR, 1.8x main lobe width  
 - Fundamental uncertainty principle: time-frequency resolution limit
 
 ---
