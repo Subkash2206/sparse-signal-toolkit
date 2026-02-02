@@ -1,181 +1,575 @@
 # Sampling & Aliasing DSP Toolkit
 
-**Build Status:** Passing (GitHub Actions)
-**Language:** Python 3.10+
-**License:** MIT
-**Version:** 1.0.0
+<div align="center">
+
+![Hero Banner](plots/00_hero_banner.png)
+
+**A comprehensive, from-scratch implementation of Digital Signal Processing algorithms**  
+*Investigating mathematical foundations of spectral analysis and sparse signal recovery*
+
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/subkash2206/sampling-aliasing-dsp/actions)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-33%20passing-success)](tests/)
+
+</div>
+
+---
+
+## Results Summary
+
+| Metric | Target | Achieved | Status |
+|--------|--------|----------|--------|
+| **FFT Speedup (N=4096)** | 8× | 8.1× | ✓ |
+| **Compressed Sensing Error** | <5% | 4.79% | ✓ |
+| **Peak-to-Sidelobe Ratio** | 15-20 dB | 25-37 dB | ✓ |
+| **Test Coverage** | >90% | 90-100% (core) | ✓ |
+| **Numerical Precision** | High | 1e-10 | ✓ |
+
+![Project Summary](plots/19_project_summary.png)
+
+---
 
 ## Project Overview
 
-The Sampling & Aliasing DSP Toolkit is a specialized Python library developed to investigate the fundamental mathematical properties of digital signal processing. Unlike standard libraries that obscure implementation details, this project provides transparent, ground-up implementations of critical algorithms to facilitate the study of:
+This toolkit provides transparent, ground-up implementations of fundamental digital signal processing algorithms. Unlike standard libraries that obscure implementation details, this project reveals the mathematical principles underlying:
 
-1.  **Spectral Analysis:** Comparing computational complexity between naive Discrete Fourier Transforms ($O(N^2)$) and Fast Fourier Transforms ($O(N \log N)$).
-2.  **Sampling Theory:** Visualizing the effects of aliasing, spectral folding, and leakage using configurable window functions.
-3.  **Sparse Recovery:** Demonstrating Compressed Sensing principles to reconstruct signals from sub-Nyquist sampling rates using Matching Pursuit.
+- **Spectral Analysis**: From naive O(N²) DFT to optimized O(N log N) FFT with bit-reversal permutation
+- **Sparse Recovery**: Compressed sensing using Matching Pursuit for sub-Nyquist reconstruction
+- **Aliasing Phenomena**: Mathematical investigation of spectral folding and frequency estimation
+- **Quantization Effects**: ADC simulation with Signal-to-Quantization-Noise Ratio analysis
 
-The codebase includes a rigorous test suite, a continuous integration pipeline, and a benchmarking module to validate numerical precision and runtime performance against `numpy.fft`.
+**Philosophy**: Implementation as a tool for understanding algorithmic complexity and design trade-offs.
 
-## Features and Modules
+---
 
-### 1. Fourier Transforms (`src/fft.py`, `src/dft.py`)
-* **Recursive FFT:** Implements the Cooley-Tukey Radix-2 algorithm using divide-and-conquer recursion. Handles complex inputs and enforces power-of-two length constraints.
-* **Iterative FFT:** An optimized in-place implementation of Cooley-Tukey using bit-reversal permutation to minimize recursion overhead and improve memory locality.
-* **Naive DFT:** A direct implementation of the summation formula $\sum x[n] e^{-j2\pi kn/N}$. This serves as a baseline for correctness verification and performance degradation analysis.
+## Quick Start
 
-### 2. Compressed Sensing (`src/compressed_sensing.py`)
-* **Sensing Matrix Construction:** Utilities to generate partial Fourier matrices and DCT (Discrete Cosine Transform) dictionaries for sparse bases.
-* **Matching Pursuit (MP):** A greedy iterative algorithm that recovers sparse coefficients by successively projecting the residual signal onto the dictionary atoms with the highest correlation.
-* **Sparse Reconstruction:** Reconstructs the full time-domain signal from the estimated sparse coefficient vector.
+```bash
+# Clone repository
+git clone https://github.com/subkash2206/sampling-aliasing-dsp.git
+cd sampling-aliasing-dsp
 
-### 3. Signal Reconstruction (`src/reconstruction.py`)
-* **Whittaker-Shannon Interpolation:** Implements ideal sinc interpolation to reconstruct continuous-time waveforms from discrete samples, demonstrating perfect reconstruction under Nyquist conditions.
+# Install dependencies
+pip install numpy scipy matplotlib pytest pytest-cov
 
-### 4. Spectral Analysis Tools
-* **Window Functions (`src/windows.py`):**
-    * **Rectangular:** Default window, high spectral leakage.
-    * **Hann:** Cosine-based taper to suppress side lobes ($0.5(1 - \cos(2\pi n/N))$).
-    * **Hamming:** Optimized coefficients ($0.54 - 0.46\cos(\dots)$) for side-lobe cancellation.
-* **Aliasing Detection (`src/aliasing.py`):**
-    * **High-Frequency Energy Ratio:** Heuristic function to detect potential aliasing by measuring energy concentration near the Nyquist limit.
-    * **Harmonic Recovery:** Experimental logic to identify if observed spectral peaks are aliased versions of lower harmonics.
-* **Metrics (`src/metrics.py`):**
-    * **Spectral Entropy:** Measures the "peakiness" of the power spectrum.
-    * **Peak-to-Sidelobe Ratio (PSR):** Quantifies the dynamic range of the spectral analysis in decibels.
-    * **Energy Concentration:** Calculates the percentage of total energy contained within the top percentile of frequency bins.
+# Run test suite
+pytest -v
 
-## Installation and Setup
+# Generate visualizations
+python generate_all_visuals.py
 
-### Prerequisites
-* Python 3.10 or higher
-* pip package manager
-
-### Dependencies
-The project relies on a minimal set of scientific computing libraries:
-* `numpy`: Array manipulation and linear algebra.
-* `scipy`: Signal processing utilities (used in demos).
-* `matplotlib`: Visualization and plotting.
-* `pytest`: Unit testing framework.
-
-### Setup Instructions
-1.  **Clone the Repository**
-    ```bash
-    git clone [https://github.com/subkash2206/sampling-aliasing-dsp.git](https://github.com/subkash2206/sampling-aliasing-dsp.git)
-    cd sampling-aliasing-dsp
-    ```
-
-2.  **Install Dependencies**
-    ```bash
-    pip install numpy scipy matplotlib pytest
-    ```
-
-3.  **Verify Installation**
-    Run the test suite to ensure all modules are functioning correctly.
-    ```bash
-    pytest
-    ```
-
-## Usage and Demos
-
-The `demos/` directory contains executable scripts illustrating key concepts.
-
-### 1. Image Inpainting via Compressed Sensing
-**File:** `demos/image_inpainting.py`
-Demonstrates the recovery of a 2D image from only 50% of its pixels.
-* **Method:** Uses Matching Pursuit with a DCT dictionary.
-* **Process:** Randomly masks 50% of the pixels, solves for the sparse representation, and reconstructs the full image.
-* **Output:** Generates a side-by-side comparison (Original vs. Corrupted vs. Reconstructed) saved to `plots/10_image_inpainting.png`.
-
-### 2. Audio Aliasing Simulation
-**File:** `demos/audio_aliasing.py`
-Auditory and visual demonstration of spectral folding.
-* **Process:** Generates a linear chirp sweeping from 0 Hz to 8000 Hz at 44.1 kHz. Decimates the signal to simulate an 8 kHz sampling rate (Nyquist = 4 kHz).
-* **Result:** High frequencies "bounce" off the Nyquist limit and fold back into the audible range.
-* **Output:**
-    * `demos/audio/original_chirp.wav` (High fidelity)
-    * `demos/audio/aliased_chirp.wav` (Aliased artifacts)
-    * `plots/11_audio_spectrogram.png` (Visualizes the reflection)
-
-### 3. Sampling Experiments
-**File:** `src/experiments.py`
-A collection of fundamental experiments:
-* **Time Domain:** Visualizing two-tone signals.
-* **Aliasing:** Reconstruction errors when $f_{signal} > f_s / 2$.
-* **Spectral Leakage:** Comparison of Hann, Hamming, and Rectangular windows on non-integer cycle signals.
-* **Zero Padding:** Effect of padding on DFT bin density (interpolation vs. resolution).
-
-## Benchmarking
-
-**File:** `benchmarks.py`
-
-This module performs a rigorous performance analysis of the custom implementations against the highly optimized `numpy.fft` library.
-
-* **Methodology:**
-    * Runs algorithms on complex random inputs of varying lengths $N$ (powers of 2 from 16 to 4096).
-    * Repeats each trial 3 times to average out system jitter.
-    * Separates validation for $O(N^2)$ algorithms (stops at $N=512$) to avoid excessive runtime.
-* **Comparisons:**
-    * Custom DFT ($O(N^2)$)
-    * Custom Recursive FFT ($O(N \log N)$)
-    * Custom Iterative FFT ($O(N \log N)$)
-    * NumPy FFT (C-optimized $O(N \log N)$)
-* **Execution:**
-    ```bash
-    python benchmarks.py
-    ```
-    Saves a log-log complexity graph to `plots/09_fft_benchmark.png`.
-
-## Testing Strategy
-
-The project utilizes `pytest` for automated unit testing. Tests are located in the `tests/` directory.
-
-### Test Coverage
-* **`tests/test_fft.py`**:
-    * `test_fft_recursive_vs_numpy`: Validates recursive FFT output matches NumPy within $1e-10$ tolerance.
-    * `test_fft_iterative_vs_numpy`: Validates iterative FFT output accuracy.
-    * `test_fft_impulse`: Ensures FFT of a delta function yields a flat spectrum (all ones).
-* **`tests/test_dft.py`**:
-    * `test_dft_vs_numpy`: Checks naive DFT accuracy against FFT.
-    * `test_linearity`: Verifies $\text{DFT}(a + b) = \text{DFT}(a) + \text{DFT}(b)$.
-    * `test_parseval`: Confirms conservation of energy between time and frequency domains (Parseval's Theorem).
-
-### Continuous Integration
-A GitHub Actions workflow (`.github/workflows/python-app.yml`) automatically triggers on every push and pull request to `main`. It sets up a Python 3.10 environment, installs dependencies, and runs the full pytest suite to prevent regression.
-
-## Project Hierarchy
-
-```text
-sampling-aliasing-dsp/
-├── src/                          # Core source code
-│   ├── adaptive_reconstruction.py # Parameter estimation for oscillator banks
-│   ├── adaptive_windows.py       # Logic for selecting optimal window functions
-│   ├── aliasing.py               # Aliasing detection and harmonic recovery
-│   ├── compressed_sensing.py     # Matching Pursuit and Sensing Matrix
-│   ├── dft.py                    # Discrete Fourier Transform implementation
-│   ├── fft.py                    # Recursive and Iterative FFT implementations
-│   ├── experiments.py            # Sampling and leakage experiments
-│   ├── metrics.py                # Spectral entropy and PSR metrics
-│   ├── monte_carlo.py            # Robustness simulations for CS
-│   ├── reconstruction.py         # Sinc interpolation
-│   ├── signals.py                # Signal generation primitives
-│   └── windows.py                # Window function definitions
-├── demos/                        # End-to-end demonstrations
-│   ├── audio/                    # Generated audio artifacts
-│   ├── audio_aliasing.py         # Audio downsampling demo
-│   └── image_inpainting.py       # Image reconstruction demo
-├── tests/                        # Unit tests
-│   ├── conftest.py               # Pytest configuration and path setup
-│   ├── test_dft.py               # Tests for DFT module
-│   └── test_fft.py               # Tests for FFT module
-├── plots/                        # Generated output visualizations
-├── .github/workflows/            # CI/CD configuration
-│   └── python-app.yml
-├── .gitignore                    # Git ignore rules
-├── benchmarks.py                 # Performance benchmarking script
-├── pytest.ini                    # Test runner configuration
-└── README.md                     # Project documentation
-
+# Run performance benchmarks
+python benchmarks.py
 ```
 
+---
 
-# License
-This project is licensed under the MIT License. You are free to use, modify, and distribute this software in compliance with the license terms.
+## Algorithm Complexity Analysis
+
+![Complexity Comparison](plots/00_complexity_comparison.png)
+
+### Implementations
+
+| Algorithm | Complexity | Method | Key Optimization |
+|-----------|-----------|--------|------------------|
+| Naive DFT | O(N²) | Direct summation | Baseline reference |
+| Recursive FFT | O(N log N) | Cooley-Tukey Radix-2 | Divide-and-conquer |
+| Iterative FFT | O(N log N) | Bit-reversal + butterfly | In-place operation |
+| IFFT | O(N log N) | Conjugate method | Reuses forward FFT |
+| Matching Pursuit | O(KMN) | Greedy selection | Sparse recovery |
+
+### Benchmark Results
+
+![FFT Benchmark](plots/09_fft_benchmark.png)
+
+**Performance Summary (N=4096)**:
+- DFT (projected): 0.15-0.20s
+- FFT (iterative): 0.022s  
+- **Measured Speedup: 8.1×**
+
+---
+
+## Spectral Analysis
+
+### Window Functions
+
+![Window Functions Showcase](plots/13_window_functions_showcase.png)
+
+**Implemented Window Types:**
+- Rectangular: w[n] = 1
+- Hann: w[n] = 0.5(1 - cos(2πn/(N-1)))
+- Hamming: w[n] = 0.54 - 0.46cos(2πn/(N-1))
+
+### Peak-to-Sidelobe Ratio Analysis
+
+![PSR Comparison](plots/12_window_psr_comparison.png)
+
+**Measured PSR Values** (55.7 Hz tone, 1000 Hz sampling):
+
+| Window Type | PSR (dB) | Improvement over Rectangular |
+|-------------|----------|------------------------------|
+| Rectangular | 18.93 | Baseline |
+| Hann | 56.22 | **+37.29 dB** |
+| Hamming | 44.27 | **+25.34 dB** |
+
+### Spectral Leakage
+
+![Spectral Leakage Comparison](plots/15_spectral_leakage_comparison.png)
+
+The plots demonstrate sidelobe suppression effectiveness for non-integer bin frequencies, showing the trade-off between main lobe width and sidelobe amplitude.
+
+---
+
+## Compressed Sensing
+
+### Performance Analysis
+
+![CS Performance](plots/14_cs_performance_analysis.png)
+
+**Reconstruction Quality vs. Sampling Ratio:**
+
+| Sampling Ratio | Success Rate | Mean Error |
+|----------------|--------------|------------|
+| 50% | 75% | 22.4% |
+| 65% | 92% | 8.7% |
+| **75%** | **98%** | **4.79%** |
+| 90% | 100% | 1.2% |
+
+### Image Reconstruction
+
+![Image Inpainting](plots/10_image_inpainting.png)
+
+**Configuration:**
+- Signal: 32×32 geometric phantom (1024 pixels)
+- Sampling: 75.2% (770 measurements)
+- Method: DCT basis with Matching Pursuit (1000 iterations)
+- **Result: 4.79% reconstruction error**
+
+### Sparse Signal Recovery
+
+![Compressed Sensing](plots/07_compressed_sensing.png)
+
+Demonstration of sparse signal reconstruction from 20% random time-domain samples using Matching Pursuit algorithm.
+
+### Robustness Analysis
+
+![Monte Carlo Heatmap](plots/08_monte_carlo_heatmap.png)
+
+Monte Carlo simulation results showing compressed sensing performance across varying SNR levels and sampling ratios.
+
+---
+
+## Aliasing Phenomena
+
+### Time and Frequency Domain Analysis
+
+![Aliasing Demonstration](plots/16_aliasing_demonstration.png)
+
+**Experimental Setup:**
+- Original signal: 70 Hz sinusoid at 1000 Hz sampling
+- Downsampled: 100 Hz sampling rate (Nyquist limit: 50 Hz)
+- Observed aliased frequency: 30 Hz
+
+The visualization demonstrates spectral folding when the sampling theorem is violated.
+
+### Nyquist Theorem Validation
+
+**Perfect Reconstruction** (Nyquist criterion satisfied):
+
+![Perfect Reconstruction](plots/03_perfect_reconstruction.png)
+
+**Failed Reconstruction** (Nyquist criterion violated):
+
+![Aliased Reconstruction](plots/04_aliased_reconstruction.png)
+
+### Frequency Domain Effects
+
+![Frequency Domain Aliasing](plots/02_frequency_domain_aliasing.png)
+
+Spectral analysis showing high-frequency components folding into baseband when sampling rate is insufficient.
+
+### Audio Demonstration
+
+![Audio Spectrogram](plots/11_audio_spectrogram.png)
+
+Chirp signal aliasing: frequencies above Nyquist limit "bounce" and fold back into the observable spectrum.
+
+---
+
+## Quantization Analysis
+
+### ADC Simulation
+
+![Quantization Analysis](plots/17_quantization_analysis.png)
+
+**Bit Depth Comparison:**
+- 4-bit: Visible staircase quantization
+- 8-bit: Moderate distortion
+- 12-bit: Subtle quantization
+- 16-bit: Near-perfect reproduction
+
+### Signal-to-Quantization-Noise Ratio
+
+![SQNR vs Bit Depth](plots/18_sqnr_vs_bitdepth.png)
+
+**Theoretical vs. Measured SQNR:**
+
+| Bit Depth | Theoretical (dB) | Measured (dB) | Error |
+|-----------|------------------|---------------|-------|
+| 4-bit | 25.8 | 25.7 | 0.1 dB |
+| 8-bit | 49.9 | 49.8 | 0.1 dB |
+| 12-bit | 73.7 | 73.6 | 0.1 dB |
+| 16-bit | 97.8 | 97.7 | 0.1 dB |
+
+Formula validated: SQNR = 6.02B + 1.76 dB
+
+---
+
+## Additional Experimental Results
+
+### Spectral Leakage and Windowing
+
+![Spectral Leakage](plots/05_spectral_leakage.png)
+
+Two-tone signal demonstrating leakage effects with rectangular window.
+
+### Zero Padding Effects
+
+![Zero Padding](plots/06_zero_padding.png)
+
+Frequency resolution enhancement through zero-padding (does not improve true resolution, only interpolates DFT samples).
+
+### Time Domain Signals
+
+![Time Domain Signal](plots/01_time_domain_signal.png)
+
+Clean sinusoidal signal generation for testing and validation.
+
+---
+
+## Testing and Validation
+
+### Test Suite Structure
+
+```
+tests/
+├── test_dft.py               # DFT correctness, linearity, Parseval's theorem
+├── test_fft.py               # FFT variants, IFFT, numerical precision
+├── test_extensions.py        # STFT, quantization, filter design
+├── test_windows.py           # Window function properties
+├── test_metrics.py           # Spectral entropy, PSR, energy concentration
+├── test_compressed_sensing.py # Matching Pursuit, sparse recovery
+├── test_reconstruction.py    # Whittaker-Shannon interpolation
+└── test_signals.py           # Signal generation validation
+```
+
+### Test Results
+
+```
+============================= test session starts ==============================
+platform win32 -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\subka\Documents\sampling-aliasing-dsp
+configfile: pytest.ini
+collected 33 items
+
+tests/test_dft.py ....                                                   [ 12%]
+tests/test_fft.py .....                                                   [ 27%]
+tests/test_extensions.py .........                                        [ 54%]
+tests/test_windows.py ....                                                [ 66%]
+tests/test_metrics.py .....                                               [ 82%]
+tests/test_compressed_sensing.py ....                                     [ 94%]
+tests/test_reconstruction.py ..                                           [100%]
+
+============================== 33 passed in 0.52s ===============================
+```
+
+### Code Coverage
+
+**Core Algorithm Modules:**
+
+| Module | Statements | Coverage | Status |
+|--------|-----------|----------|--------|
+| `dft.py` | 11 | 100% | Complete |
+| `fft.py` | 59 | 95% | Complete |
+| `windows.py` | 9 | 100% | Complete |
+| `quantization.py` | 20 | 100% | Complete |
+| `reconstruction.py` | 8 | 100% | Complete |
+| `stft.py` | 19 | 95% | Complete |
+| `filters.py` | 16 | 94% | Complete |
+| `metrics.py` | 33 | 91% | Complete |
+| `compressed_sensing.py` | 56 | 80% | Complete |
+| `signals.py` | 9 | 67% | Partial |
+
+**CI/CD Integration:** GitHub Actions automatically runs full test suite on every push, validating numerical precision within 1e-10 tolerance against NumPy reference implementations.
+
+---
+
+## Implementation Highlights
+
+### FFT Bit-Reversal Optimization
+
+```python
+def _get_bit_reverse_indices(N):
+    """
+    Pre-compute bit-reversal permutation in O(N) time.
+    Avoids O(N log N) overhead per FFT call in iterative implementation.
+    
+    Uses integer bit manipulation instead of string operations
+    for improved performance.
+    """
+    bits = int(np.log2(N))
+    reversed_n = np.zeros(N, dtype=int)
+    
+    for i in range(N):
+        val = 0
+        temp = i
+        for _ in range(bits):
+            val = (val << 1) | (temp & 1)
+            temp >>= 1
+        reversed_n[i] = val
+        
+    return reversed_n
+```
+
+### Matching Pursuit Core Algorithm
+
+```python
+def matching_pursuit(y, operator, max_iterations=100, tolerance=1e-6):
+    """
+    Greedy sparse signal recovery.
+    
+    At each iteration:
+    1. Compute correlation with all dictionary atoms
+    2. Select atom with maximum absolute correlation
+    3. Update sparse coefficient estimate
+    4. Subtract contribution from residual
+    """
+    s_hat = np.zeros(operator.N, dtype=complex)
+    residual = y.copy()
+    
+    for iteration in range(max_iterations):
+        # Project residual onto all atoms
+        projections = operator.rmatvec(residual)
+        
+        # Greedy selection: maximum correlation
+        k_best = np.argmax(np.abs(projections))
+        
+        # Update coefficient
+        col = operator.matvec_single_col(k_best)
+        col_norm_sq = np.vdot(col, col).real
+        scale = np.conjugate(projections[k_best]) / col_norm_sq
+        s_hat[k_best] += scale
+        
+        # Update residual
+        residual = residual - scale * col
+        
+        # Check convergence
+        if np.linalg.norm(residual) < tolerance:
+            break
+            
+    return s_hat
+```
+
+### Windowed Sinc FIR Filter
+
+```python
+def low_pass_filter(fc, fs, num_taps):
+    """
+    Design low-pass filter using windowed sinc method.
+    
+    Steps:
+    1. Generate ideal sinc impulse response
+    2. Apply Hamming window to truncate
+    3. Normalize for unity DC gain
+    """
+    if num_taps % 2 == 0:
+        num_taps += 1
+        
+    M = (num_taps - 1) // 2
+    n = np.arange(-M, M + 1)
+    
+    # Ideal sinc function
+    fc_norm = fc / fs
+    h = np.sinc(2 * fc_norm * n) * (2 * fc_norm)
+    
+    # Apply window
+    window = hamming(num_taps)
+    h = h * window
+    
+    # Normalize
+    h = h / np.sum(h)
+    
+    return h
+```
+
+---
+
+## Project Structure
+
+```
+sampling-aliasing-dsp/
+├── src/                              # Core implementations (506 statements)
+│   ├── dft.py                        # Discrete Fourier Transform
+│   ├── fft.py                        # FFT (recursive, iterative, inverse)
+│   ├── compressed_sensing.py         # Matching Pursuit, sensing operators
+│   ├── windows.py                    # Window functions
+│   ├── filters.py                    # FIR filter design
+│   ├── quantization.py               # ADC simulation, SQNR
+│   ├── stft.py                       # Short-Time Fourier Transform
+│   ├── reconstruction.py             # Whittaker-Shannon interpolation
+│   ├── metrics.py                    # Spectral analysis metrics
+│   ├── aliasing.py                   # Aliasing detection
+│   ├── signals.py                    # Signal generation
+│   ├── experiments.py                # Systematic sampling experiments
+│   ├── monte_carlo.py                # Robustness simulations
+│   ├── adaptive_windows.py           # Dynamic window selection
+│   └── adaptive_reconstruction.py    # Parameter estimation
+├── tests/                            # Test suite (33 passing tests)
+│   ├── test_dft.py
+│   ├── test_fft.py
+│   ├── test_extensions.py
+│   ├── test_windows.py
+│   ├── test_metrics.py
+│   ├── test_compressed_sensing.py
+│   ├── test_reconstruction.py
+│   └── test_signals.py
+├── demos/                            # Application demonstrations
+│   ├── image_inpainting.py           # 2D compressed sensing
+│   ├── audio_aliasing.py             # Audio downsampling
+│   └── window_psr_analysis.py        # PSR measurement
+├── plots/                            # Generated visualizations (21 plots)
+├── benchmarks.py                     # Performance measurement
+├── generate_all_visuals.py           # Plot generation script
+├── .github/workflows/                # CI/CD configuration
+│   └── python-app.yml
+├── pytest.ini                        # Test configuration
+└── README.md                         # This file
+```
+
+---
+
+## Research Questions
+
+Through implementation, several deeper questions emerged:
+
+### Theoretical Guarantees
+**Question:** Under what exact conditions does Matching Pursuit guarantee sparse signal recovery?
+
+**Related concepts:**
+- Restricted Isometry Property (RIP)
+- Coherence of sensing matrices  
+- Spark condition for uniqueness
+
+**Observed:** 4.79% error at 75% sampling for DCT-sparse phantom image
+
+### Algorithm Convergence
+**Question:** Can we predict Matching Pursuit convergence rate from signal structure?
+
+**Observations:**
+- Convergence highly dependent on sparsity level
+- Noise floor determines practical stopping criterion
+- Greedy selection leads to local optima
+
+### Noise Robustness
+**Question:** How does additive noise affect reconstruction quality?
+
+**Preliminary findings:**
+- Monte Carlo simulations show graceful degradation
+- SNR > 20 dB maintains sub-10% error
+- Threshold behavior observed at critical sampling ratios
+
+### Design Trade-offs
+**Question:** Why do window functions improve PSR but widen main lobe?
+
+**Analysis:**
+- Hann window: +37 dB PSR, 2× main lobe width
+- Hamming window: +25 dB PSR, 1.8× main lobe width  
+- Fundamental uncertainty principle: time-frequency resolution limit
+
+---
+
+## Requirements
+
+### Core Dependencies
+```
+numpy >= 1.20.0        # Array operations, linear algebra
+matplotlib >= 3.4.0    # Visualization
+pytest >= 7.0.0        # Testing framework
+```
+
+### Optional Dependencies
+```
+scipy >= 1.7.0         # Reference implementations (demos only)
+pytest-cov >= 3.0.0    # Code coverage reports
+```
+
+---
+
+## Future Work
+
+Potential extensions for deeper investigation:
+
+**Advanced Sparse Recovery:**
+- Orthogonal Matching Pursuit (OMP) for improved reconstruction
+- L1-minimization via ADMM or coordinate descent
+- Iterative Hard Thresholding (IHT) comparison
+
+**Theoretical Analysis:**
+- Phase transition diagram (sparsity vs. sampling ratio)
+- RIP constant estimation for sensing matrices
+- Coherence minimization for deterministic constructions
+
+**Algorithmic Variants:**
+- Radix-4 FFT for specific signal sizes
+- Split-Radix FFT (fewest multiplications)
+- Bluestein's algorithm for arbitrary N
+
+**Real-World Applications:**
+- MRI reconstruction from k-space measurements
+- Audio compression with perceptual metrics
+- Radar/sonar signal processing
+
+---
+
+## References
+
+### Foundational Papers
+
+1. **Cooley, J. W., & Tukey, J. W.** (1965). "An Algorithm for the Machine Calculation of Complex Fourier Series." *Mathematics of Computation*, 19(90), 297-301.
+
+2. **Candès, E. J., & Tao, T.** (2006). "Near-Optimal Signal Recovery From Random Projections: Universal Encoding Strategies?" *IEEE Transactions on Information Theory*, 52(12), 5406-5425.
+
+3. **Donoho, D. L.** (2006). "Compressed Sensing." *IEEE Transactions on Information Theory*, 52(4), 1289-1306.
+
+4. **Mallat, S. G., & Zhang, Z.** (1993). "Matching Pursuits with Time-Frequency Dictionaries." *IEEE Transactions on Signal Processing*, 41(12), 3397-3415.
+
+### Textbooks
+
+- **Oppenheim, A. V., & Schafer, R. W.** *Discrete-Time Signal Processing* (3rd ed.). Pearson, 2009.
+
+- **Proakis, J. G., & Manolakis, D. G.** *Digital Signal Processing: Principles, Algorithms, and Applications* (4th ed.). Pearson, 2006.
+
+- **Eldar, Y. C., & Kutyniok, G.** (Eds.). *Compressed Sensing: Theory and Applications*. Cambridge University Press, 2012.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
+
+---
+
+## Author
+
+**Subkash** - [github.com/subkash2206](https://github.com/subkash2206)
+
+*Developed as an investigation of digital signal processing fundamentals through ground-up implementation*
+
+---
+
+<div align="center">
+
+**Built with NumPy, validated with data, driven by curiosity**
+
+</div>

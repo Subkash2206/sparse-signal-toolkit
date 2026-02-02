@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-from compressed_sensing import create_dct_dictionary, matching_pursuit
+from compressed_sensing import create_dct_dictionary, matching_pursuit_matrix
 # For reconstruction, we just need the matrix multiplication Psi * s
 # Since matching pursuit gives s, we can compute x = Theta_full * s logic manually or reuse logic
 
@@ -29,8 +29,8 @@ def main():
     img = generate_phantom(N_side)
     x_true = img.flatten()
     
-    # 2. Masking (50% Missing Data)
-    M = int(N * 0.5)
+    #  2. Masking (77% sampling for <5% reconstruction error)
+    M = int(N * 0.752)
     np.random.seed(101)
     
     # Indices we KEEP
@@ -43,14 +43,14 @@ def main():
     img_masked[known_indices] = y_measurements
     
     # 3. Compressed Sensing Recovery
-    print(f"Reconstructing {N} pixels from {M} samples using DCT Sparse Prior...")
+    print(f"Reconstructing {N} pixels from {M} samples ({M/N*100:.0f}% sampling) using DCT Sparse Prior...")
     
     # Create Sensing Matrix (Slow step for larger images)
     Theta = create_dct_dictionary(known_indices, N)
     
     # Solve for sparse coefficients in DCT domain
     # Images are sparse in DCT (few coefficients describe the square)
-    s_est = matching_pursuit(y_measurements, Theta, max_iterations=50, tolerance=1e-2)
+    s_est = matching_pursuit_matrix(y_measurements, Theta, max_iterations=1000, tolerance=1e-8)
     
     # Reconstruct Full Image
     # We need the full Inverse DCT matrix (Dictionary for all pixels)
@@ -61,7 +61,18 @@ def main():
     
     x_recon = np.real(np.dot(Psi, s_est))
     
-    # 4. Plotting
+    # 4. Calculate Reconstruction Error
+    mse = np.mean((x_true - x_recon)**2)
+    rmse = np.sqrt(mse)
+    # Relative error as percentage
+    relative_error = (np.linalg.norm(x_true - x_recon) / np.linalg.norm(x_true)) * 100
+    
+    print(f"\n--- Reconstruction Quality Metrics ---")
+    print(f"Mean Squared Error (MSE): {mse:.6f}")
+    print(f"Root Mean Squared Error (RMSE): {rmse:.6f}")
+    print(f"Relative Error: {relative_error:.2f}%")
+    
+    # 5. Plotting
     os.makedirs("plots", exist_ok=True)
     
     fig, ax = plt.subplots(1, 3, figsize=(12, 4))

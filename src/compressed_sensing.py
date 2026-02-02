@@ -93,11 +93,30 @@ def create_sensing_matrix(t_samples, N_grid):
     """
     return SensingOperator(t_samples, N_grid)
 
-# create_dct_dictionary removed? User asked to refactor 'create_sensing_matrix'.
-# I will keep create_dct_dictionary as legacy or refactor it too if requested,
-# but the prompt specifically mentioned 'create_sensing_matrix'.
-# I'll leave a placeholder or remove it to save space if unused in the new flow.
-# I will focus on the SensingOperator as the primary replacement.
+def create_dct_dictionary(indices, N):
+    """
+    Creates a DCT (Discrete Cosine Transform) sensing matrix.
+    This is useful for image compression/reconstruction as images are sparse in DCT domain.
+    
+    indices: Which rows to keep (sampled pixel locations)
+    N: Total signal dimension
+    
+    Returns: M x N matrix where each column is a DCT basis vector
+    """
+    from scipy.fftpack import dct
+    
+    # Create full DCT dictionary (N x N)
+    # Each column is a DCT basis vector
+    Psi = np.zeros((N, N))
+    for k in range(N):
+        basis = np.zeros(N)
+        basis[k] = 1
+        # Inverse DCT to get the basis vector in signal domain
+        Psi[:, k] = dct(basis, type=2, norm='ortho')
+    
+    # Subsample to get sensing matrix (M x N)
+    return Psi[indices, :]
+
 
 def matching_pursuit(y, operator, max_iterations=20, tolerance=1e-6):
     """
@@ -153,6 +172,46 @@ def matching_pursuit(y, operator, max_iterations=20, tolerance=1e-6):
         residual = residual - term
         
     return s_hat
+
+def matching_pursuit_matrix(y, Theta, max_iterations=20, tolerance=1e-6):
+    """
+    Performs Matching Pursuit (MP) using a dense matrix.
+    
+    y: Observed samples (M,)
+    Theta: Sensing matrix (M x N)
+    max_iterations: Maximum number of iterations
+    tolerance: Convergence threshold
+    
+    Returns: Sparse coefficient vector s_hat (N,)
+    """
+    M, N = Theta.shape
+    residual = y.copy().astype(complex)
+    s_hat = np.zeros(N, dtype=complex)
+    
+    # Pre-compute column norms for efficiency
+    col_norms_sq = np.sum(np.abs(Theta)**2, axis=0)
+    
+    for it in range(max_iterations):
+        # 1. Compute correlations with all columns
+        # projections[k] = <residual, Theta[:, k]>
+        projections = np.dot(np.conjugate(Theta.T), residual)
+        
+        # 2. Find best match
+        k_best = np.argmax(np.abs(projections))
+        
+        if np.abs(projections[k_best]) < tolerance:
+            break
+        
+        # 3. Update coefficient
+        # scale = <column_k, residual> / <column_k, column_k>
+        scale = projections[k_best] / col_norms_sq[k_best]
+        s_hat[k_best] += scale
+        
+        # 4. Update residual
+        residual = residual - scale * Theta[:, k_best]
+    
+    return s_hat
+
 
 def reconstruction_from_sparse(s_hat, N):
     """
